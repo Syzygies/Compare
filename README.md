@@ -31,6 +31,7 @@ Two algorithms are tested: **Tarjan** (union-find with path compression) and **L
 | OCaml | 48 | 40.94s | ±0.03s |
 | Haskell | 42 | 47.48s | ±0.05s |
 | Chez Scheme | 40 | 49.22s | ±0.07s |
+| Lean 4 | 10 | 198.63s | ±1.02s |
 
 #### Loops (simple algorithm, predictable access patterns)
 
@@ -47,6 +48,7 @@ Two algorithms are tested: **Tarjan** (union-find with path compression) and **L
 | OCaml | 52 | 25.03s | ±0.02s |
 | Haskell | 41 | 31.68s | ±0.01s |
 | Chez Scheme | 38 | 34.32s | ±0.08s |
+| Lean 4 | 18 | 72.63s | ±0.23s |
 
 I could imagine committing to any language on this list. Various other languages were considered, and dropped as impractical.
 
@@ -106,7 +108,7 @@ I love Ruby for scripting but it doesn't scale or perform well for math research
 
 I'm an old Haskell programmer, coming from SML then OCaml. F# is not quite OCaml, with an impressive jit, and .NET rusty bedsprings poking through. I've been through Lisp, Scheme, Clojure, Erlang, Idris. All of these functional choices left me uncertain for various reasons.
 
-In my dreams I only code in Lean 4. Alas, AI really struggles to use Lean as a general purpose programming language. While one might hope from Lean's design that it would be the fastest functional programming language, it was too slow to make this list. Lean 4 is young and under active development; I will certainly revisit this question.
+In my dreams I only code in Lean 4. Alas, AI really struggles to use Lean as a general purpose programming language. While one might hope from Lean's design that it would be the fastest functional programming language, it was the slowest language on my list. Lean 4 is young and under active development; I will certainly revisit this question.
 
 My bias against Java was so extreme that I ignored Scala completely, only taking another look after being puzzled by its featured status in the Zed editor. I saw a native compiler so I gave it a try. Of course, the JVM jit is faster.
 

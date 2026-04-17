@@ -18,7 +18,7 @@ As a guiding principle, when this specification is unclear or ambiguous, develop
 
 ### 2.1. Core Requirements
 
-All language implementations must conform to the following requirements to ensure a fair and accurate comparison. **F# and OCaml serve as the reference implementations.**
+All language implementations must conform to the following requirements to ensure a fair and accurate comparison. **Scala and OCaml serve as the reference implementations.**
 
 1.  **Problem Domain**: For a given integer `n`, the program must calculate the distribution of cycle counts for all `n! * 2^n` signed permutations. The output is an array where the value at index `k` is the number of signed permutations that decompose into `2n - k` cycles.
 
@@ -39,6 +39,7 @@ All language implementations must conform to the following requirements to ensur
         * Swift: `typealias Relations = Loops // Select Tarjan or Loops`
         * F#: `module Sets = Loops // Select Tarjan or Loops`
         * Haskell: `type Relations = Tarjan.Relations -- Select Tarjan or Loops`
+        * Scala: comment on line before, then `type Relations = Tarjan; val name = "Tarjan"` on next line
         
         **Note**: When using the Worker module pattern, the algorithm selection line typically appears in the Worker module rather than the main module, since that's where the algorithm is actually used.
     * **Build-script switching**: Selection in the build/run script, provided the script contains the same pattern comment for automated switching
