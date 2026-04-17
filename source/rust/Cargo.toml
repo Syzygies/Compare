@@ -5,12 +5,10 @@ edition = "2021"
 
 [[bin]]
 name = "perms"
-path = "perms.rs"
+path = "src/perms.rs"
 
 [dependencies]
 rayon = "1.8.0"
-num_cpus = "1.16.0"
-itertools = "0.12.1"
 
 [profile.release]
 opt-level = 3

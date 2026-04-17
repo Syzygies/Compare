@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+
+# clojure
+# run [n] [prefix] [cores]
+
+n=${1:-8}
+prefix=${2:-3}
+
+cores=$(sysctl -n hw.perflevel0.physicalcpu 2>/dev/null || nproc 2>/dev/null || echo 8)
+cores=${3:-$cores}
+
+cd "$(dirname "$0")"
+top=$(git rev-parse --show-toplevel)
+
+# Select Tarjan or Loops
+# (Algorithm selection handled in worker.clj require statement)
+
+"$top/bin/log-run" "clojure -M:run -m perms" $n $prefix $cores

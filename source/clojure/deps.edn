@@ -1,0 +1,8 @@
+{:paths ["src"]
+ :deps {}
+ :aliases
+ {:run {:jvm-opts ["-server" 
+                    "-Xmx4g" 
+                    "-XX:+UseParallelGC"
+                    "-Dclojure.compile.direct-linking=true"
+                    "-Dclojure.compiler.direct-linking=true"]}}}

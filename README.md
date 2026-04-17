@@ -20,17 +20,17 @@ Two algorithms are tested: **Tarjan** (union-find with path compression) and **L
 
 | Language | Score | Time | Variance |
 |---|---:|---:|---:|
-| Rust | 100 | 19.78s | ±0.03s |
-| C++ | 99 | 20.03s | ±0.30s |
+| C++ | 100 | 19.67s | ±0.14s |
+| Rust | 97 | 20.18s | ±0.02s |
 | F# | 95 | 20.81s | ±0.09s |
-| Scala | 91 | 21.84s | ±0.04s |
-| Kotlin | 88 | 22.48s | ±0.14s |
-| Scala Native | 77 | 25.79s | ±0.09s |
+| Scala | 90 | 21.84s | ±0.04s |
+| Kotlin | 87 | 22.48s | ±0.14s |
+| Scala Native | 76 | 25.79s | ±0.09s |
 | Nim | 76 | 26.06s | ±0.03s |
-| Julia | 65 | 30.54s | ±0.06s |
+| Julia | 64 | 30.54s | ±0.06s |
 | Swift | 60 | 33.10s | ±0.09s |
 | OCaml | 48 | 40.94s | ±0.03s |
-| Haskell | 42 | 47.48s | ±0.05s |
+| Haskell | 41 | 47.48s | ±0.05s |
 | Chez Scheme | 40 | 49.22s | ±0.07s |
 | Lean 4 | 10 | 198.63s | ±1.02s |
 
@@ -38,18 +38,18 @@ Two algorithms are tested: **Tarjan** (union-find with path compression) and **L
 
 | Language | Score | Time | Variance |
 |---|---:|---:|---:|
-| Rust | 100 | 13.11s | ±0.03s |
-| C++ | 100 | 13.16s | ±0.12s |
-| Julia | 90 | 14.50s | ±0.01s |
-| F# | 82 | 15.89s | ±0.03s |
-| Kotlin | 79 | 16.54s | ±0.12s |
-| Scala | 78 | 16.80s | ±0.08s |
+| C++ | 100 | 13.24s | ±0.07s |
+| Rust | 100 | 13.28s | ±0.03s |
+| Julia | 91 | 14.50s | ±0.01s |
+| F# | 83 | 15.89s | ±0.03s |
+| Kotlin | 80 | 16.54s | ±0.12s |
+| Scala | 79 | 16.80s | ±0.08s |
 | Scala Native | 76 | 17.32s | ±0.10s |
 | Nim | 74 | 17.79s | ±0.02s |
 | Swift | 65 | 20.26s | ±0.02s |
-| OCaml | 52 | 25.03s | ±0.02s |
-| Haskell | 41 | 31.68s | ±0.01s |
-| Chez Scheme | 38 | 34.32s | ±0.08s |
+| OCaml | 53 | 25.03s | ±0.02s |
+| Haskell | 42 | 31.68s | ±0.01s |
+| Chez Scheme | 39 | 34.32s | ±0.08s |
 | Lean 4 | 18 | 72.63s | ±0.23s |
 
 I could imagine committing to any language on this list. Various other languages were considered, and dropped as impractical.
@@ -98,7 +98,7 @@ just show Tarjan 10       # Display Tarjan results for n=10
 
 1. **Allocation in hot loops is the primary performance killer.** Top-tier performance requires eliminating allocation from the inner loops.
 
-2. **JIT compilers gain more from algorithmic complexity.** Scala JVM scores 91 on Tarjan but 78 on Loops — a wider gap than ahead-of-time compilers show between the two algorithms.
+2. **JIT compilers gain more from algorithmic complexity.** Scala JVM scores 90 on Tarjan but 79 on Loops — a wider gap than ahead-of-time compilers show between the two algorithms.
 
 3. **Simple parallel patterns work well.** A short atomic work-stealing queue is competitive with language-native parallel frameworks.
 
@@ -114,7 +114,7 @@ In my dreams I only code in Lean 4. Alas, AI really struggles to use Lean as a g
 
 My bias against Java was so extreme that I ignored Scala completely, only taking another look after being puzzled by its featured status in the Zed editor. I saw a native compiler so I gave it a try. Of course, the JVM jit is faster.
 
-Kotlin arrived later as the obvious second JVM comparison; it runs within noise of Scala but doesn't displace it. Kotlin could be a pragmatic choice, but it is a regression in expressiveness from Scala 3 for mathematical work.
+Kotlin arrived later as the obvious second JVM comparison; it runs within noise of Scala but doesn't displace it. Kotlin could be a pragmatic choice, but it is a regression in expressiveness from Scala 3 for mathematical work. Clojure also targets the JVM but it's way too slow to warrant consideration.
 
 It is hard to shed prejudices about how code should look, even if learning to see clearly past convention is the only good reason to be a mathematician. I'm already quite sure how I will die: I'll read another article on Hacker News about a new programming language where I see nothing new, and I'll read that they included {}; to make C programmers comfortable. I'll have a massive stroke.
 

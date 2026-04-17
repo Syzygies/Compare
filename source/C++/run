@@ -17,6 +17,6 @@ CXXFLAGS="-O3 -DNDEBUG -march=native -std=c++20 -pthread"
 mkdir -p "_build"
 
 echo "Building C++..."
-$CXX $CXXFLAGS -I./include perms.cpp -o "_build/perms" || exit 1
+$CXX $CXXFLAGS -I./include -I./src src/perms.cpp -o "_build/perms" || exit 1
 
 "$top/bin/log-run" "./_build/perms" $n $prefix $cores

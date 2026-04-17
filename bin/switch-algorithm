@@ -13,8 +13,9 @@ unless %w[loops tarjan].include?(algo)
 end
 
 files = [
-  "source/C++/perms.cpp",
+  "source/C++/src/worker.hpp",
   "source/chez/src/perms.ss",
+  "source/clojure/src/worker.clj",
   "source/F#/src/perms.fs",
   "source/haskell/src/Worker.hs",
   "source/julia/src/perms.jl",
@@ -23,7 +24,7 @@ files = [
   "source/nim/src/perms.nim",
   "source/ocaml/src/worker.ml",
   "source/ruby/perms.rb",
-  "source/rust/perms.rs",
+  "source/rust/src/worker.rs",
   "source/swift/src/Worker.swift",
   "source/scala/src/Worker.scala"
 ]

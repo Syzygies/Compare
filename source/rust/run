@@ -13,8 +13,8 @@ top=$(git rev-parse --show-toplevel)
 # Set build directory
 export CARGO_TARGET_DIR="_build"
 
-# Rebuild if binary is missing or older than source
-if [[ ! -f _build/release/perms ]] || [[ perms.rs -nt _build/release/perms ]]; then
+# Rebuild if binary is missing or any source is newer
+if [[ ! -f _build/release/perms ]] || [[ -n "$(find src Cargo.toml -newer _build/release/perms 2>/dev/null | head -1)" ]]; then
     echo "Building Rust..."
     cargo build --release || exit 1
     # Clean up build artifacts, keeping only the binary
