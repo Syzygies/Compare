@@ -6,8 +6,6 @@
 !source/**
 !bin/
 !bin/**
-!doc/
-!doc/**
 
 # Allow these files
 !README.md
