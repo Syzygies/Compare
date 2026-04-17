@@ -92,13 +92,13 @@ just show Tarjan 10       # Display Tarjan results for n=10
 
 ### Key Insights
 
-1. **Allocation in hot loops is the primary performance killer.** Every language that reached the top tier did so by eliminating allocation from the inner loops. Languages that made this difficult (Haskell, OCaml) paid heavily.
+1. **Allocation in hot loops is the primary performance killer.** Top-tier performance requires eliminating allocation from the inner loops.
 
-2. **JIT compilers shine on complex algorithms.** Scala JVM scores 91 on Tarjan but 79 on Loops. The JIT optimizes based on actual runtime behavior — path lengths in union-find, branch prediction patterns — which ahead-of-time compilers must guess at.
+2. **JIT compilers gain more from algorithmic complexity.** Scala JVM scores 91 on Tarjan but 79 on Loops — a wider gap than ahead-of-time compilers show between the two algorithms.
 
-3. **Simple parallel patterns beat frameworks.** A 40-line atomic work queue outperformed every parallel library we tried. The overhead of generality is measurable at this scale.
+3. **Simple parallel patterns work well.** A short atomic work-stealing queue is competitive with language-native parallel frameworks.
 
-4. **Readability and performance aren't opposed.** Rust, Scala, and F# all deliver top-tier performance with code that clearly expresses the algorithm. The tradeoff is between languages, not between clarity and speed.
+4. **The top tier is readable.** Scala and F# deliver near-Rust performance with concise, expressive code.
 
 ### Conclusion
 
