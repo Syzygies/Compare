@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+
+lang=$1
+
+bin="$(cd "$(dirname "$0")" && pwd)"
+cd "$bin/../source"
+
+case $lang in
+   "F#")
+      # .editorconfig
+      fantomas F#/src/*.fs
+      ;;
+   ocaml)
+      cd ocaml
+      dune fmt > /dev/null 2>&1 || true
+      "$bin/lisp-braces" --format src/*.ml
+      ;;
+   haskell)
+      # fourmolu.yaml
+      fourmolu -i haskell/src/*.hs
+      ;;
+   chez)
+      "$bin/tab-chez" chez/src/*.ss
+      ;;
+   *)
+      echo "F#, ocaml, haskell, chez"
+      exit 1
+      ;;
+esac

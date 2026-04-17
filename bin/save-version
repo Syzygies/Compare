@@ -1,0 +1,107 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# save-version: Archives current version of language implementation
+# Usage: save-version <language>
+# Creates a new versioned directory in history/<language> and copies source/<language> files there
+
+require 'fileutils'
+require 'pathname'
+
+# Command to archive current language implementation to history with versioning
+class SaveVersionCommand
+  VALID_LANGUAGES = %w[ruby swift ocaml haskell lean rust scheme].freeze
+
+  def initialize(language)
+    @language = language
+    @project_root = find_project_root
+    @source_dir = @project_root.join('source', @language)
+    @history_dir = @project_root.join('history', @language)
+  end
+
+  def run
+    validate_args
+    check_git_status
+
+    # Create history directory if it doesn't exist
+    FileUtils.mkdir_p(@history_dir)
+
+    # Determine next version number
+    next_version = next_version_number
+
+    # Create destination directory
+    dest_dir = @history_dir.join("v#{next_version}")
+    puts "Creating #{dest_dir.relative_path_from(@project_root)}"
+
+    # Copy source to history
+    copy_source_to_history(dest_dir)
+
+    # Remove timings.txt from source
+    remove_timings_file
+
+    puts "Successfully archived #{@language} as version #{next_version}"
+  end
+
+  private
+
+  def find_project_root
+    dir = Pathname.new(Dir.pwd)
+    while dir != Pathname.new('/')
+      return dir if Dir.exist?(dir.join('source')) && Dir.exist?(dir.join('history'))
+
+      dir = dir.parent
+    end
+    raise "Could not find project root containing 'source' and 'history' directories"
+  end
+
+  def validate_args
+    unless VALID_LANGUAGES.include?(@language)
+      raise "Error: '#{@language}' not found. Implementations: #{VALID_LANGUAGES.join(', ')}"
+    end
+
+    return if Dir.exist?(@source_dir)
+
+    raise "Error: Source directory '#{@source_dir}' does not exist"
+  end
+
+  def check_git_status
+    status = `git -C #{@project_root} status --porcelain`
+    return if status.strip.empty?
+
+    raise 'Error: Git working tree is not clean. Please commit or stash changes first.'
+  end
+
+  def next_version_number
+    existing_versions = Dir.glob(@history_dir.join('v*')).map do |dir|
+      match = File.basename(dir).match(/^v(\d+)$/)
+      match ? match[1].to_i : 0
+    end
+
+    existing_versions.empty? ? 1 : existing_versions.max + 1
+  end
+
+  def copy_source_to_history(dest_dir)
+    FileUtils.cp_r("#{@source_dir}/.", dest_dir.to_s)
+  end
+
+  def remove_timings_file
+    timings_file = @source_dir.join('timings.txt')
+    File.delete(timings_file) if File.exist?(timings_file)
+  end
+end
+
+if __FILE__ == $PROGRAM_NAME
+  if ARGV.length != 1
+    puts 'Usage: save-version <language>'
+    exit 1
+  end
+
+  begin
+    SaveVersionCommand.new(ARGV[0]).run
+  rescue StandardError => e
+    # Remove the leading "Error: " if it's already there
+    message = e.message.start_with?('Error: ') ? e.message : "Error: #{e.message}"
+    puts message
+    exit 1
+  end
+end

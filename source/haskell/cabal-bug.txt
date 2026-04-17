@@ -1,0 +1,70 @@
+BUG REPORT: cabal list-bin returns incorrect path for executables built with -O2
+
+SUMMARY
+-------
+When building an executable with `cabal build -O2`, the resulting binary is placed in 
+an optimization-specific directory (*/opt/build/*), but `cabal list-bin` returns the 
+path for the default optimization level (*/build/*), which is incorrect and causes 
+scripts and tooling to fail.
+
+REPRODUCTION STEPS
+------------------
+1. Create a simple Haskell project with an executable named 'perms'
+2. Run: cabal build -O2
+3. Run: cabal list-bin perms
+4. Try to execute the path returned by list-bin
+
+EXPECTED BEHAVIOR
+-----------------
+`cabal list-bin perms` should return:
+dist-newstyle/build/aarch64-osx/ghc-9.6.7/perms-0.1.0.0/x/perms/opt/build/perms/perms
+
+This is where the -O2 build actually places the executable.
+
+ACTUAL BEHAVIOR
+---------------
+`cabal list-bin perms` returns:
+dist-newstyle/build/aarch64-osx/ghc-9.6.7/perms-0.1.0.0/x/perms/build/perms/perms
+
+This path does not exist when building with -O2.
+
+SYSTEM INFORMATION
+------------------
+- Cabal version: 3.10.x (via GHCup)
+- GHC version: 9.6.7
+- OS: macOS (Darwin 24.6.0, aarch64)
+- Project: Single executable with optimization flags
+
+IMPACT
+------
+This bug breaks any script or tool that:
+1. Builds with non-default optimization levels
+2. Uses cabal list-bin to find the resulting executable
+3. Expects cabal list-bin to return the actual path of the built binary
+
+This is particularly problematic because:
+- There's no flag to make list-bin optimization-aware
+- cabal exec -- which perms works but is a workaround, not a solution
+- Scripts must resort to find commands or hard-coded paths
+
+The bug violates the principle of least surprise: after successfully building 
+an executable, the build tool should be able to tell you where it put it.
+
+ADDITIONAL NOTES
+----------------
+- The same issue likely affects other optimization levels (-O0, etc.)
+- This may also affect profiling builds and other build variants
+- The issue persists even after the source files are modified and recompiled
+
+WORKAROUND
+----------
+Current workaround is to use find to locate the executable:
+find dist-newstyle -path "*/opt/build/perms/perms" -type f -perm +111
+
+But this is fragile and shouldn't be necessary.
+
+PROPOSED FIX
+------------
+cabal list-bin should be aware of the build configuration used and return 
+the correct path for the actual built executable, not a default path that 
+may not exist.

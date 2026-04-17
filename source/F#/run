@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+
+# F#
+# run [n] [prefix] [cores]
+
+n=${1:-9}
+prefix=${2:-}
+cores=${3:-}
+
+cd "$(dirname "$0")"
+top=$(git rev-parse --show-toplevel)
+
+# Build with release configuration
+echo "Building F#..."
+dotnet build -c Release --nologo --verbosity quiet || exit 1
+
+# Run the compiled binary directly
+"$top/bin/log-run" ./_build/Release/net9.0/F# $n $prefix $cores

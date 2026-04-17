@@ -1,0 +1,136 @@
+#!/usr/bin/env ruby
+
+if ARGV.length != 1
+  puts "Usage: #{$0} [loops|tarjan]"
+  exit 1
+end
+
+algo = ARGV[0].downcase
+
+unless %w[loops tarjan].include?(algo)
+  puts "Error: Algorithm must be 'loops' or 'tarjan' (case insensitive)"
+  exit 1
+end
+
+files = [
+  "source/C++/perms.cpp",
+  "source/chez/src/perms.ss",
+  "source/F#/src/perms.fs",
+  "source/haskell/src/Worker.hs",
+  "source/julia/src/perms.jl",
+  "source/lean/run",
+  "source/nim/src/perms.nim",
+  "source/ocaml/src/worker.ml",
+  "source/ruby/perms.rb",
+  "source/rust/perms.rs",
+  "source/swift/src/Worker.swift",
+  "source/scala/src/Worker.scala"
+]
+
+Dir.chdir(File.dirname(__FILE__) + "/..")
+
+# Generic function: find marker and return the algorithm on next line
+def find_algorithm_line(file)
+  lines = File.readlines(file)
+  lines.each_with_index do |line, i|
+    if line.include?("Select Tarjan or Loops") && i + 1 < lines.length
+      next_line = lines[i + 1]
+      if next_line =~ /(tarjan|Tarjan|loops|Loops)/
+        return { index: i, lines: lines, current_algo: $1.downcase }
+      else
+        return { index: i, lines: lines, current_algo: nil }
+      end
+    end
+  end
+  nil  # Marker not found
+end
+
+changed_languages = []
+already_set = true
+failed_files = []
+
+files.each do |file|
+  unless File.exist?(file)
+    puts "\e[31mERROR: FILE NOT FOUND: #{file}\e[0m"
+    exit 1
+  end
+  
+  lang = file.split('/')[1]
+  
+  # Find current state
+  result = find_algorithm_line(file)
+  
+  if result.nil?
+    puts "\e[31mERROR: Required comment 'Select Tarjan or Loops' not found in #{file}\e[0m"
+    failed_files << file
+    next
+  end
+  
+  if result[:current_algo].nil?
+    puts "\e[31mERROR: Found marker but no Tarjan/Loops on next line in #{file}\e[0m"
+    failed_files << file
+    next
+  end
+  
+  # Modify if needed
+  if result[:current_algo] != algo
+    already_set = false
+    changed_languages << lang
+    
+    lines = result[:lines]
+    i = result[:index]
+    next_line = lines[i + 1]
+    original_line = next_line.dup
+    
+    # Preserve case when replacing
+    if algo == 'loops'
+      lines[i + 1] = next_line.gsub(/[Tt]arjan/, next_line.include?('Tarjan') ? 'Loops' : 'loops')
+    else
+      lines[i + 1] = next_line.gsub(/[Ll]oops/, next_line.include?('Loops') ? 'Tarjan' : 'tarjan')
+    end
+    
+    # Check that we actually changed something
+    if lines[i + 1] == original_line
+      failed_files << file
+      puts "\e[31mERROR: Failed to modify line in #{file}\e[0m"
+      puts "\e[31m  Line unchanged: #{original_line.strip}\e[0m"
+      next
+    end
+    
+    File.write(file, lines.join)
+    
+    # Verify independently - re-read and check
+    verify_result = find_algorithm_line(file)
+    if verify_result.nil? || verify_result[:current_algo] != algo
+      failed_files << file
+      puts "\e[31mERROR: Verification failed for #{file}\e[0m"
+      if verify_result.nil?
+        puts "\e[31m  Marker line not found after modification\e[0m"
+      elsif verify_result[:current_algo].nil?
+        puts "\e[31m  Expected: #{algo.capitalize}, but found no valid algorithm name\e[0m"
+      else
+        puts "\e[31m  Expected: #{algo.capitalize}, Got: #{verify_result[:current_algo].capitalize}\e[0m"
+      end
+    end
+  end
+end
+
+# Check for failures
+unless failed_files.empty?
+  failed_languages = failed_files.map { |f| f.split('/')[1] }.uniq
+  puts "\e[31mFAILED for languages: #{failed_languages.join(', ')}\e[0m"
+  failed_files.each { |f| puts "  - #{f}" }
+  exit 1
+end
+
+# Output summary
+if already_set
+  puts "#{algo.capitalize} is active algorithm"
+else
+  if changed_languages.length <= 2
+    puts "Switching #{changed_languages.join(', ')}"
+  else
+    puts "Switching to #{algo.capitalize}"
+  end
+  puts "#{algo.capitalize} is active algorithm"
+end

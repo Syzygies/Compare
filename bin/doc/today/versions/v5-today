@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+# January 25, 2025
+# Cursor, Claude 3.5 Sonnet
+
+set -euo pipefail
+
+# Change to script directory
+cd "$(dirname "$0")" || {
+    echo "Error: Could not locate script directory. Please ensure the script exists and has proper permissions."
+    exit 1
+}
+
+# Using workspace-provided $top environment variable
+TODAY_DIR="${top}/archive/${YEAR}/${MONTH_DAY}"
+CONTEXT_DIR="${TODAY_DIR}/context"
+
+# Get today's date components
+YEAR="$(date +%Y)"
+MONTH_DAY="$(date +%m-%d)"
+
+# Function to generate index.txt for a context directory
+generate_index() {
+    local dir="$1"
+    local index_file="${dir}/index.txt"
+    
+    # Create index.txt with header
+    echo "# Read these files. Do not edit this index, which is auto-generated." > "${index_file}"
+    echo "" >> "${index_file}"
+    
+    # List files (not directories), excluding index.txt itself
+    find "$dir" -maxdepth 1 -type f -not -name "index.txt" -print0 | \
+        while IFS= read -r -d '' file; do
+            basename "$file"
+        done | sort >> "${index_file}"
+    
+    # Remove index if no other files were found
+    if [[ $(wc -l < "${index_file}") -le 2 ]]; then
+        rm "${index_file}"
+    fi
+}
+
+# Create today's directory and starter files if they don't exist
+mkdir -p "${CONTEXT_DIR}" || {
+    echo "Error: Could not create today's workspace at ${CONTEXT_DIR}"
+    echo "Please check directory permissions and available disk space."
+    exit 1
+}
+
+for file in =overview.md lessons.md quotes.md; do
+    if [[ ! -f "${CONTEXT_DIR}/${file}" ]]; then
+        : > "${CONTEXT_DIR}/${file}" || {
+            echo "Error: Could not create ${file} in ${CONTEXT_DIR}"
+            echo "Please check file permissions and available disk space."
+            exit 1
+        }
+    fi
+done
+
+# First pass: cleanup old items (excluding today's folder)
+find "${top}/archive/${YEAR}" -type f -name "index.txt" -delete || {
+    echo "Error: Failed to clean up old index.txt files"
+    echo "Please check file permissions in ${top}/archive/${YEAR}"
+    exit 1
+}
+
+# Remove empty files (excluding today's directory)
+find "${top}/archive/${YEAR}" -type f -empty -not -path "${TODAY_DIR}/*" -delete || {
+    echo "Error: Failed to clean up empty files"
+    echo "Please check file permissions in ${top}/archive/${YEAR}"
+    exit 1
+}
+
+# Remove empty directories (excluding today's directory)
+find "${top}/archive/${YEAR}" -type d -empty -not -path "${TODAY_DIR}" \
+    -not -path "${TODAY_DIR}/*" -delete 2>/dev/null || true
+
+# Second pass: generate fresh indexes for all context directories
+while IFS= read -r dir; do
+    if [[ -d "$dir" ]]; then
+        generate_index "$dir" || {
+            echo "Error: Failed to generate index for ${dir}"
+            echo "Please check directory permissions and available disk space."
+            exit 1
+        }
+    fi
+done < <(find "${top}/archive/${YEAR}" -type d -name "context")

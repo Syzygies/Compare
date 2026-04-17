@@ -1,0 +1,135 @@
+#!/usr/bin/env ruby
+
+require 'json'
+require 'fileutils'
+require 'date'
+
+# Set strict error handling
+trap('INT') { exit 1 }
+
+# Helper class to manage workspace operations
+class WorkspaceManager
+  def self.find_workspace(dir = Dir.pwd)
+    while dir != '/'
+      workspace_file = Dir.glob(File.join(dir, '*.code-workspace')).first
+      return workspace_file if workspace_file
+      dir = File.dirname(dir)
+    end
+    nil
+  end
+
+  def self.validate_workspace(file)
+    content = JSON.parse(File.read(file))
+    settings = content.dig('settings', 'terminal.integrated.env.osx')
+    raise "Invalid workspace: missing terminal.integrated.env.osx section" unless settings
+    raise "Invalid workspace: missing required variables" unless settings['top'] && settings['bin'] && settings['now']
+    true
+  end
+
+  def self.update_workspace(file, new_date)
+    content = JSON.parse(File.read(file))
+    
+    # Create backup
+    FileUtils.cp(file, "#{file}.bak")
+    
+    # Update the now variable
+    settings = content['settings']['terminal.integrated.env.osx']
+    settings['now'] = "${workspaceFolder}/today/#{new_date}"
+    
+    # Write updated content
+    File.write(file, JSON.pretty_generate(content))
+    
+    # Verify update
+    validate_workspace(file)
+  rescue => e
+    # Restore backup on failure
+    FileUtils.mv("#{file}.bak", file) if File.exist?("#{file}.bak")
+    raise "Failed to update workspace: #{e.message}"
+  ensure
+    FileUtils.rm("#{file}.bak") if File.exist?("#{file}.bak")
+  end
+end
+
+# Helper class to manage today directory operations
+class TodayManager
+  def initialize(workspace_file)
+    @workspace_file = workspace_file
+    @workspace_dir = File.dirname(workspace_file)
+  end
+
+  def create_new_staging_directory
+    today_dir = File.join(@workspace_dir, 'today')
+    FileUtils.mkdir_p(today_dir)
+
+    new_date = Date.today.strftime('%m-%d')
+    new_staging_dir = File.join(today_dir, new_date)
+    
+    # Don't recreate if it already exists
+    return if File.directory?(new_staging_dir)
+    
+    # Create new staging directory
+    FileUtils.mkdir_p(new_staging_dir)
+    
+    # Find previous staging directory
+    prev_date = find_previous_staging_date
+    
+    # Copy template.md forward if it exists
+    if prev_date
+      prev_template = File.join(today_dir, prev_date, 'template.md')
+      if File.exist?(prev_template)
+        FileUtils.cp(prev_template, File.join(new_staging_dir, 'template.md'))
+      end
+    end
+    
+    # Create template.md if it doesn't exist
+    create_default_template(new_staging_dir) unless File.exist?(File.join(new_staging_dir, 'template.md'))
+    
+    # Create empty readme.md
+    File.write(File.join(new_staging_dir, 'readme.md'), '')
+    
+    # Update workspace
+    WorkspaceManager.update_workspace(@workspace_file, new_date)
+  end
+
+  private
+
+  def find_previous_staging_date
+    today_dir = File.join(@workspace_dir, 'today')
+    return nil unless File.directory?(today_dir)
+    
+    Dir.entries(today_dir)
+       .select { |entry| entry =~ /^\d{2}-\d{2}$/ }
+       .sort
+       .last
+  end
+
+  def create_default_template(dir)
+    template_content = <<~TEMPLATE
+      # Directory Structure Template
+      
+      This template guides the organization of our staging directories.
+      Edit this file to evolve our practices, and it will be carried forward.
+      
+      ## Common Patterns
+      - context/ - For background and planning documents
+      - research/ - For investigation and learning
+      - implementation/ - For actual code changes
+    TEMPLATE
+    
+    File.write(File.join(dir, 'template.md'), template_content)
+  end
+end
+
+# Main execution
+begin
+  workspace_file = WorkspaceManager.find_workspace
+  raise "No workspace file found" unless workspace_file
+  
+  WorkspaceManager.validate_workspace(workspace_file)
+  
+  today_manager = TodayManager.new(workspace_file)
+  today_manager.create_new_staging_directory
+rescue => e
+  puts "Error: #{e.message}"
+  exit 1
+end

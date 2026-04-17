@@ -1,0 +1,164 @@
+#!/usr/bin/env ruby
+
+require 'open3'
+require 'time'
+require 'pathname'
+
+# Configuration for significant digits
+CSV_SIG_DIGITS = 3      # Significant digits for CSV output
+DISPLAY_SIG_DIGITS = 3  # Significant digits for display output
+
+# Color codes
+COLORS = {
+  yellow: 214,  # Dimmer, more orange-tinted yellow
+  green: 46,
+  blue: 33,
+  red: 196,
+  cyan: 51,
+  orange: 208,
+  brick: 202  # Bright red-orange, between red and yellow
+}.freeze
+
+# Print colored header
+def header(color, text)
+  color_code = COLORS[color.to_sym] || 226
+  puts "\e[38;5;#{color_code}m#{text}\e[0m\n"
+end
+
+# Parse command line arguments
+remaining_args = ARGV.dup
+
+exe = remaining_args[0] or abort "Usage: log-run <executable> <n> [prefix] [cores]"
+n = (remaining_args[1] || 8).to_i
+prefix = (remaining_args[2] || 3).to_i
+
+# Get language from current directory
+langu = File.basename(Dir.pwd)
+host = `hostname`.strip
+
+# Default cores to performance core count on Apple Silicon
+cores = if remaining_args[3]
+  remaining_args[3].to_i
+else
+  perf_cores = `sysctl -n hw.perflevel0.physicalcpu`.strip.to_i
+  abort "Error: Invalid performance core count: #{perf_cores}" unless perf_cores > 0
+  perf_cores
+end
+
+# Print header
+puts "\n"
+header(:green, "#{langu} #{host} #{Time.now.strftime('%Y-%m-%d %H:%M')}")
+
+# Build command
+cmd_parts = exe.split
+cmd_parts.concat([n, prefix, cores].map(&:to_s))
+
+puts cmd_parts.join(" ")
+puts
+
+# Run with timing
+start_time = Time.now
+output, status = Open3.capture2e("gtime", "-f", "%e %U %S", "-o", "/tmp/timing.#{$$}", *cmd_parts)
+real_time = Time.now - start_time
+exit_status = status.exitstatus
+
+# Display output
+print output
+
+# Read timing from gtime
+timing_data = File.read("/tmp/timing.#{$$}").strip
+File.delete("/tmp/timing.#{$$}")
+real, user, sys = timing_data.split.map(&:to_f)
+
+# Extract algorithm and version from first line
+first_line = output.lines.first&.strip || ""
+if first_line =~ /^(\w+)\s+v(\d+),/
+  algorithm = $1
+  manual_version = $2
+else
+  algorithm = ""
+  manual_version = ""
+end
+
+# Get git version (we're already in source/language/ directory)
+git_version = `git log -1 --format=%h -- perms.* 2>/dev/null`.strip
+if !git_version.empty? && !system("git diff --quiet perms.* 2>/dev/null")
+  # Check if the only change is the algorithm selection line
+  diff_output = `git diff perms.* 2>/dev/null`
+  # Count the actual changed lines (lines starting with + or -, excluding headers)
+  changed_lines = diff_output.lines.select { |line| 
+    (line.start_with?('+') || line.start_with?('-')) && 
+    !line.start_with?('+++') && !line.start_with?('---')
+  }
+  # If all changed lines contain "Select Tarjan or Loops", it's just the toggle
+  if changed_lines.all? { |line| line.include?("Select Tarjan or Loops") }
+    # Only the algorithm selection changed, don't mark as dirty
+  else
+    git_version += "*"
+  end
+end
+
+# Format a number to specific significant digits
+def format_sig_digits(value, sig_digits)
+  return "0" if value == 0
+  
+  # Calculate the order of magnitude
+  magnitude = Math.log10(value.abs).floor
+  
+  # Calculate decimal places needed
+  decimal_places = sig_digits - magnitude - 1
+  
+  # Handle very small numbers
+  if decimal_places < 0
+    # Round to nearest power of 10
+    scale = 10 ** -decimal_places
+    (value / scale).round * scale
+  else
+    # Use sprintf for consistent formatting
+    format = "%.#{decimal_places}f"
+    sprintf(format, value)
+  end
+end
+
+# Calculate gigaletters/second if measurable
+gigaletters_per_sec = if n > 0 && real > 0
+  factorial = (1..n).inject(:*) || 1
+  total_perms = factorial * (2 ** n)
+  total_perms.to_f * n / (real * 1_000_000_000)
+else
+  0
+end
+
+# Format for CSV with specified significant digits
+gigaletters_csv = gigaletters_per_sec > 0 ? format_sig_digits(gigaletters_per_sec, CSV_SIG_DIGITS) : ""
+
+# Build and output CSV line
+timestamp = Time.now.strftime("%Y-%m-%d %H:%M:%S")
+csv_line = [timestamp, host, langu, algorithm, manual_version, git_version, 
+            n, prefix, cores, real, user, sys, gigaletters_csv].join(",")
+
+puts
+puts csv_line
+
+# Save to CSV and display throughput if measurable
+if n > 0 && real > 0 && exit_status == 0
+  # Append to machine-specific CSV file (only on success)
+  csv_file = File.expand_path("../timings/data/#{host}.csv", __dir__)
+  File.open(csv_file, "a") do |f|
+    f.puts csv_line
+  end
+end
+
+# Display throughput if measurable
+if n > 0 && real > 0
+  
+  # Switch to megaletters for display when rate is low
+  if gigaletters_per_sec < 1
+    megaletters_per_sec = gigaletters_per_sec * 1000
+    header(:yellow, "#{langu} #{format_sig_digits(megaletters_per_sec, DISPLAY_SIG_DIGITS)} megaletters/second (#{real.round(2)} seconds)")
+  else
+    header(:yellow, "#{langu} #{format_sig_digits(gigaletters_per_sec, DISPLAY_SIG_DIGITS)} gigaletters/second (#{real.round(2)} seconds)")
+  end
+  puts "\n\n"
+
+end

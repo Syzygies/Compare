@@ -1,0 +1,87 @@
+#!/usr/bin/env ruby
+
+require 'find'
+require 'pathname'
+
+def colorize(text, color_code)
+  "\e[#{color_code}m#{text}\e[0m"
+end
+
+def binary?(file)
+  return true unless File.file?(file)
+  File.read(file, 512).encode('UTF-8', invalid: :replace, replace: '').include?("\0")
+rescue
+  true
+end
+
+def search_var(varname)
+  project_root = ENV['top'] || ENV['PROJECT_ROOT'] || Dir.pwd
+  exclude_patterns = [
+    /\.git\//,
+    /\.code-workspace$/,
+    /#{varname}_[A-Z_]+/,  # Avoid matching longer vars containing varname
+    /[A-Z_]+_#{varname}/   # Avoid matching longer vars containing varname
+  ]
+
+  results = {
+    curly: [],    # ${VAR}
+    direct: [],   # $VAR
+    raw: []       # VAR (declarations/assignments)
+  }
+
+  Find.find(project_root) do |path|
+    next if exclude_patterns.any? { |pattern| path.match?(pattern) }
+    next if binary?(path)
+    next unless File.file?(path)
+
+    relative_path = Pathname.new(path).relative_path_from(Pathname.new(project_root)).to_s
+    
+    File.foreach(path).with_index(1) do |line, num|
+      if line.include?("${#{varname}}")
+        results[:curly] << [relative_path, num, line.strip]
+      elsif line.include?("$#{varname}")
+        results[:direct] << [relative_path, num, line.strip]
+      elsif line.match?(/\b#{varname}\b/) && 
+            !line.include?("${#{varname}}") && 
+            !line.include?("$#{varname}")
+        results[:raw] << [relative_path, num, line.strip]
+      end
+    end
+  end
+
+  results
+end
+
+def print_results(results)
+  if results[:curly].any?
+    puts "\n" + colorize("${VAR} syntax matches:", "36")
+    results[:curly].each do |path, num, line|
+      puts "  #{path}:#{num}: #{line}"
+    end
+  end
+
+  if results[:direct].any?
+    puts "\n" + colorize("$VAR syntax matches:", "32")
+    results[:direct].each do |path, num, line|
+      puts "  #{path}:#{num}: #{line}"
+    end
+  end
+
+  if results[:raw].any?
+    puts "\n" + colorize("Raw variable name matches:", "33")
+    results[:raw].each do |path, num, line|
+      puts "  #{path}:#{num}: #{line}"
+    end
+  end
+
+  puts "\nNo matches found." if results.values.all?(&:empty?)
+end
+
+if ARGV.empty?
+  puts "Usage: var-search VARNAME"
+  exit 1
+end
+
+varname = ARGV[0].upcase
+results = search_var(varname)
+print_results(results) 

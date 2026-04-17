@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+
+# Julia
+# run [n] [prefix] [cores]
+
+n=${1:-9}
+prefix=${2:-3}
+cores=${3:-12}
+
+cd "$(dirname "$0")"
+top=$(git rev-parse --show-toplevel)
+
+# Run Julia with optimizations
+export JULIA_NUM_THREADS=$cores
+"$top/bin/log-run" ./julia-runner $n $prefix $cores

@@ -1,0 +1,6 @@
+<Project>
+  <PropertyGroup>
+    <BaseOutputPath>_build</BaseOutputPath>
+    <BaseIntermediateOutputPath>_build/obj</BaseIntermediateOutputPath>
+  </PropertyGroup>
+</Project>

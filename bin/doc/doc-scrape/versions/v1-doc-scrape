@@ -1,0 +1,89 @@
+#!/usr/bin/env ruby
+
+require 'nokogiri'
+require 'fileutils'
+require 'open-uri'
+require 'set'
+require 'uri'
+
+# Primary source for documentation
+# SOURCE_URL = 'https://lean-lang.org/people/'
+SOURCE_URL = 'https://lean-lang.org/'
+
+# File types to skip (fonts and PDFs)
+SKIP_EXTENSIONS = %w[pdf ttf otf woff woff2 eot]
+
+# All paths are relative to the parent directory of this script
+INPUT_PATH = 'fetched/lean-lang.org'
+OUTPUT_PATH = 'extracted/lean-docs'
+
+# Resolve paths relative to script location
+SCRIPT_DIR = File.dirname(File.expand_path(__FILE__))
+ROOT_DIR = File.expand_path('..', SCRIPT_DIR)
+INPUT_DIR = File.join(ROOT_DIR, INPUT_PATH)
+OUTPUT_DIR = File.join(ROOT_DIR, OUTPUT_PATH)
+
+# Main processing class
+class LeanDocsProcessor
+  def initialize(input_dir, output_dir)
+    @input_dir = input_dir
+    @output_dir = output_dir
+  end
+
+  def process
+    puts "Processing Lean documentation..."
+    puts "Input directory: #{@input_dir}"
+    puts "Output directory: #{@output_dir}"
+  end
+end
+
+def download_directories
+  FileUtils.mkdir_p(INPUT_DIR)
+  
+  log_file = File.join(SCRIPT_DIR, "download.log")
+  
+  source_uri = URI.parse(SOURCE_URL)
+  escaped_path = Regexp.escape(source_uri.path)
+  accept_pattern = source_uri.path == "/" ? 
+                  "^#{source_uri.scheme}://#{source_uri.host}/.*" :
+                  "^#{source_uri.scheme}://#{source_uri.host}#{escaped_path}/.*"
+  
+  system("wget", "-r", "-np", "-nH",
+         "--domains=#{source_uri.host}",
+         "--reject=#{SKIP_EXTENSIONS.join(',')}",
+         "--accept-regex=#{accept_pattern}",
+         "-P", INPUT_DIR, SOURCE_URL,
+         [:out, :err] => log_file)
+end
+
+# Program entry point
+if __FILE__ == $0
+  puts
+
+  def show_usage
+    puts <<~USAGE
+      Usage: #{File.basename($0)} [option]
+      
+      Options:
+        --download     Download or update Lean documentation from lean-lang.org
+        --process      Process downloaded files into formatted documentation
+        --help         Show this help message
+      
+      Notes:
+        - Download affects: #{INPUT_DIR}
+        - Processing output to: #{OUTPUT_DIR}
+        - Each option is exclusive (choose one)
+    USAGE
+    exit 1
+  end
+
+  case ARGV[0]
+  when '--download'
+    download_directories
+  when '--process'
+    processor = LeanDocsProcessor.new(INPUT_DIR, OUTPUT_DIR)
+    processor.process
+  else
+    show_usage
+  end
+end

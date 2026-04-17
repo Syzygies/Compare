@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+
+# Watch threads spawned by a language implementation
+# Usage: bin/watch-threads <language> [n] [prefix] [cores]
+
+language=${1:-ocaml}
+n=${2:-9}
+prefix=${3:-3}
+cores=${4:-12}
+
+if [ -z "$language" ]; then
+    echo "Usage: $0 <language> [n] [prefix] [cores]"
+    exit 1
+fi
+
+cd "$(dirname "$0")/.."
+
+# Start the process in background
+echo "Starting $language with n=$n prefix=$prefix cores=$cores..."
+./source/$language/run $n $prefix $cores &
+PID=$!
+
+# Give it a moment to spawn threads
+sleep 0.2
+
+# Monitor threads while process is running
+echo ""
+echo "=== Thread Information for $language (PID: $PID) ==="
+
+# Check if process is still running
+if kill -0 $PID 2>/dev/null; then
+    # Count threads (macOS compatible)
+    THREAD_COUNT=$(ps -M $PID 2>/dev/null | tail -n +2 | wc -l)
+    echo "Thread count: $THREAD_COUNT"
+    
+    # Show detailed thread info if requested
+    if [ "$VERBOSE" = "1" ]; then
+        echo ""
+        echo "Detailed threads:"
+        ps -M $PID 2>/dev/null | head -20
+    fi
+    
+    # For OCaml specifically, we can check domain info
+    if [ "$language" = "ocaml" ] && command -v lsof >/dev/null 2>&1; then
+        echo ""
+        echo "Open files/threads (via lsof):"
+        lsof -p $PID 2>/dev/null | grep -E "(REG|PIPE|systm)" | wc -l
+    fi
+fi
+
+# Wait for process to complete
+wait $PID 2>/dev/null
+EXIT_CODE=$?
+
+echo ""
+echo "Process completed with exit code: $EXIT_CODE"

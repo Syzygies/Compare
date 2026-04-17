@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Display tree structure for each source directory, hiding build artifacts
+
+show() {
+    echo
+    if [ -z "$2" ]; then
+        tree -F --noreport source/$1 | sed 's/ -> .*/@/'
+    else
+        tree -F --noreport source/$1 -I "$2" | sed 's/ -> .*/@/'
+    fi
+}
+
+show C++ 'build'
+show F# 'obj|bin'
+show chez '*.so'
+show haskell 'dist-newstyle|.stack-work|arm64|hidir|*.o|*.hi|*.prof'
+show lean '.lake|build'
+show ocaml '_build'
+show ruby
+show rust 'target'
+show swift '.build|.swiftpm'

@@ -1,0 +1,96 @@
+#!/usr/bin/env ruby
+
+require 'fileutils'
+require 'pathname'
+
+def analyze_directory(path, list_label = nil)
+  extensions = Hash.new { |h, k| h[k] = { count: 0, size: 0, files: [] } }
+  base_path = Pathname.new(path)
+  
+  Dir.glob("#{path}/**/*").each do |file|
+    next unless File.file?(file)
+    
+    basename = File.basename(file)
+    
+    # First pass: find the extension territory
+    if basename =~ /\.([a-zA-Z.]+[^a-zA-Z.]?)/
+      ext_territory = $1
+      
+      # Second pass: get final extension
+      if ext_territory.include?('.')
+        # For compound extensions like 'min.js', take after last period
+        ext = ext_territory[ext_territory.rindex('.') + 1..]
+      else
+        # Simple extension or one with terminator like 'html?'
+        ext = ext_territory
+      end
+    else
+      ext = '(no extension)'
+    end
+    
+    extensions[ext][:count] += 1
+    extensions[ext][:size] += File.size(file)
+    # Store relative path to make output more readable
+    extensions[ext][:files] << Pathname.new(file).relative_path_from(base_path).to_s
+  end
+  
+  # Print header with spacing
+  puts
+  puts "File extensions in: #{path}"
+  puts
+  
+  # Prepare table output
+  table_rows = []
+  table_rows << "Label | Extension | Size (MB) | Count | Avg (MB)"
+  
+  # Track extension info for potential listing
+  list_ext = nil
+  list_files = nil
+  
+  # Sort by size in descending order and assign labels
+  extensions.to_a.sort_by { |_, stats| -stats[:size] }.each_with_index do |(ext, stats), i|
+    label = ('A'.ord + i).chr
+    avg_size = stats[:size] / stats[:count]
+    table_rows << "#{label} | #{ext} | #{human_size_mb(stats[:size])} | #{stats[:count]} | #{human_size_mb(avg_size)}"
+    
+    # Store info for listing if label matches
+    if list_label && label == list_label.upcase
+      list_ext = ext
+      list_files = stats[:files]
+    end
+  end
+
+  # Format and print the table
+  formatted = IO.popen(['column', '-t', '-s', '|'], 'w+') do |io|
+    io.puts table_rows
+    io.close_write
+    io.read
+  end
+
+  # Print table with blank line after header
+  puts formatted.lines.first
+  puts
+  print formatted.lines.drop(1).join
+  
+  # If we have files to list, show them after the table
+  if list_files
+    puts
+    puts "#{list_label}        Files with extension '#{list_ext}':"
+    puts
+    list_files.sort.each do |file|
+      puts file
+    end
+  end
+end
+
+def human_size_mb(bytes)
+  sprintf("%.2f", bytes / 1024.0 / 1024.0)
+end
+
+if ARGV.empty?
+  puts "Usage: #{$0} <directory> [label]"
+  puts "  If label (A-Z) is provided, lists all files with that extension"
+  exit 1
+end
+
+analyze_directory(ARGV[0], ARGV[1])

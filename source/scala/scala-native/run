@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+
+# scala-native
+# run [n] [prefix] [cores]
+
+n=${1:-}
+prefix=${2:-}
+cores=${3:-}
+
+cd "$(dirname "$0")"
+top=$(git rev-parse --show-toplevel)
+
+scala-cli package --power --native --native-mode release-full -f -o perms ../src/ 2>&1 | grep -v "^Compiling\|^Compiled\|^Wrote\|^Warning\|^Packaging\|^\[info\]" || exit 1
+
+"$top/bin/log-run" ./perms $n $prefix $cores

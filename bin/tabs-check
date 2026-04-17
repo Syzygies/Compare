@@ -1,0 +1,43 @@
+#!/usr/bin/env ruby
+
+# Check that file indentation is consistent with detected tab width
+
+if ARGV.empty?
+  puts "Usage: tabs-check <file>"
+  exit 1
+end
+
+file_path = ARGV[0]
+
+unless File.exist?(file_path)
+  puts "Error: File '#{file_path}' not found"
+  exit 1
+end
+
+lines = File.readlines(file_path)
+tab_width = nil
+
+# Find the first indented line to determine tab width
+lines.each do |line|
+  if line =~ /^( +)[^ ]/
+    tab_width = $1.length
+    break
+  end
+end
+
+if tab_width.nil?
+  puts "No indented lines found to determine tab width"
+  exit 0
+end
+
+puts "Detected tab width: #{tab_width}"
+
+# Check all lines for consistency
+lines.each_with_index do |line, index|
+  if line =~ /^( +)[^ ]/
+    spaces = $1.length
+    if spaces % tab_width != 0
+      puts "#{index + 1}: #{line.chomp}"
+    end
+  end
+end

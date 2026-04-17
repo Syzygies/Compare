@@ -1,0 +1,377 @@
+#!/usr/bin/env ruby
+
+require 'parslet'
+require 'optparse'
+
+# Tokenizes OCaml preserving all structure
+class OCamlLexer < Parslet::Parser
+  rule(:string_literal) {
+    str('"') >> (
+      str('\\') >> any |
+      (str('"').absent? >> any)
+    ).repeat >> str('"')
+  }
+  
+  rule(:comment) {
+    str('(*') >> (
+      comment |
+      str('*)').absent? >> any
+    ).repeat >> str('*)')
+  }
+  
+  rule(:open_delim) {
+    str('{').as(:open) |
+    str('(').as(:open)
+  }
+  
+  rule(:close_delim) {
+    str('}').as(:close) |
+    str(')').as(:close)
+  }
+  
+  rule(:semicolon) {
+    str(';').as(:semi)
+  }
+  
+  rule(:other_char) {
+    match('[^{}();"]').as(:char)
+  }
+  
+  rule(:token) {
+    string_literal.as(:string) |
+    comment.as(:comment) |
+    open_delim |
+    close_delim |
+    semicolon |
+    other_char
+  }
+  
+  root(:tokens)
+  rule(:tokens) { token.repeat }
+end
+
+# Represents a delimited block
+Block = Struct.new(:delimiter, :prefix, :content, :multiline, :has_semicolon, :start_pos, :end_pos)
+
+# Finds blocks in token stream
+class BlockFinder
+  def initialize(tokens)
+    @tokens = tokens
+  end
+  
+  def find_all
+    blocks = []
+    pos = 0
+    
+    while pos < @tokens.length
+      if @tokens[pos][:open]
+        block = extract_block(pos)
+        if block && should_format?(block)
+          blocks << block
+          pos = block.end_pos + 1
+        else
+          pos += 1
+        end
+      else
+        pos += 1
+      end
+    end
+    
+    blocks
+  end
+  
+  private
+  
+  def extract_block(open_pos)
+    delimiter = @tokens[open_pos][:open].to_s
+    
+    # Find line start
+    line_start = open_pos
+    while line_start > 0 && @tokens[line_start - 1][:char] != "\n"
+      line_start -= 1
+    end
+    
+    # Find matching close
+    depth = 1
+    close_pos = open_pos + 1
+    
+    while close_pos < @tokens.length && depth > 0
+      token = @tokens[close_pos]
+      if token[:open] == delimiter
+        depth += 1
+      elsif token[:close] == matching_close(delimiter)
+        depth -= 1
+      end
+      break if depth == 0
+      close_pos += 1
+    end
+    
+    return nil if depth != 0
+    
+    # Extract parts
+    prefix = reconstruct(@tokens[line_start...open_pos]).rstrip
+    content_tokens = @tokens[(open_pos + 1)...close_pos]
+    
+    # Check properties
+    multiline = content_tokens.any? { |t| t[:char] == "\n" }
+    has_semicolon = has_exposed_semicolon?(content_tokens, delimiter)
+    
+    # Process content based on type
+    content = if multiline
+      reconstruct(content_tokens)
+    elsif has_semicolon
+      extract_fields(content_tokens, delimiter)
+    else
+      [reconstruct(content_tokens).strip]
+    end
+    
+    Block.new(delimiter, prefix, content, multiline, has_semicolon, line_start, close_pos)
+  end
+  
+  def should_format?(block)
+    return false if !block
+    
+    if block.multiline
+      # Multi-line: check delimiter positioning
+      delimiter_ends_line?(@tokens, block.start_pos + block.prefix.length) &&
+      delimiter_ends_line?(@tokens, block.end_pos)
+    elsif block.delimiter == '('
+      # Single-line parens: only format if has semicolon
+      block.has_semicolon
+    else
+      # Single-line braces: always format
+      true
+    end
+  end
+  
+  def has_exposed_semicolon?(tokens, delimiter)
+    depth = 0
+    tokens.any? do |token|
+      depth += 1 if token[:open] == delimiter
+      depth -= 1 if token[:close] == matching_close(delimiter)
+      token[:semi] && depth == 0
+    end
+  end
+  
+  def extract_fields(tokens, delimiter)
+    fields = []
+    current = []
+    depth = 0
+    
+    tokens.each do |token|
+      if token[:open] == delimiter
+        depth += 1
+        current << token
+      elsif token[:close] == matching_close(delimiter)
+        depth -= 1
+        current << token
+      elsif token[:semi] && depth == 0
+        fields << reconstruct(current).strip unless current.empty?
+        current = []
+      else
+        current << token
+      end
+    end
+    
+    fields << reconstruct(current).strip unless current.empty?
+    fields
+  end
+  
+  def delimiter_ends_line?(tokens, pos)
+    (pos + 1...tokens.length).each do |i|
+      return true if tokens[i][:char] == "\n"
+      return false if tokens[i][:char] && tokens[i][:char].to_s !~ /\s/
+    end
+    true
+  end
+  
+  def matching_close(open)
+    open == '{' ? '}' : ')'
+  end
+  
+  def reconstruct(tokens)
+    tokens.map { |t| t.values.first.to_s }.join
+  end
+end
+
+# Formats blocks with unified rules
+class LispFormatter
+  def format(block)
+    open = block.delimiter
+    close = matching_close(open)
+    
+    if block.multiline
+      format_multiline(block, open, close)
+    elsif block.has_semicolon
+      format_with_fields(block, open, close)
+    else
+      format_simple(block, open, close)
+    end
+  end
+  
+  private
+  
+  def format_simple(block, open, close)
+    # Single field/content, no semicolons - just ensure spacing
+    content = block.content.first
+    if block.prefix.empty? || block.prefix =~ /^\s*$/
+      "#{block.prefix}#{open} #{content} #{close}"
+    else
+      "#{block.prefix} #{open} #{content} #{close}"
+    end
+  end
+  
+  def format_with_fields(block, open, close)
+    fields = block.content
+    
+    if fields.length == 1
+      # Single field - keep compact
+      if block.prefix.empty? || block.prefix =~ /^\s*$/
+        "#{block.prefix}#{open} #{fields[0]} #{close}"
+      else
+        "#{block.prefix} #{open} #{fields[0]} #{close}"
+      end
+    elsif block.prefix =~ /^\s*$/
+      # Multiple fields, just indentation prefix
+      indent = block.prefix
+      result = "#{indent}#{open} #{fields[0]}"
+      fields[1..-1].each { |f| result += ";\n#{indent}  #{f}" }
+      result + " #{close}"
+    else
+      # Multiple fields, code prefix
+      base_indent = block.prefix[/^\s*/]
+      result = "#{block.prefix}\n"
+      result += "#{base_indent}  #{open} #{fields[0]}"
+      fields[1..-1].each { |f| result += ";\n#{base_indent}    #{f}" }
+      result + " #{close}"
+    end
+  end
+  
+  def format_multiline(block, open, close)
+    content = block.content
+    base_indent = block.prefix[/^\s*/] || ""
+    
+    # Strip leading newline if present - it's just formatting, not content
+    content = content.sub(/^\n/, "")
+    
+    # Split content and find its natural indentation
+    lines = content.split("\n")
+    first_content = lines.find { |l| !l.strip.empty? }
+    content_indent = first_content ? first_content[/^\s*/] : ""
+    
+    # Remove content's base indent
+    normalized = lines.map do |line|
+      line.strip.empty? ? "" : line.sub(/^#{Regexp.escape(content_indent)}/, "")
+    end
+    
+    if block.prefix =~ /^\s*$/
+      # Just indentation - inline format
+      first = normalized.first || ""
+      rest = normalized[1..-1] || []
+      
+      result = "#{base_indent}#{open} #{first}"
+      rest.each { |line| result += "\n#{base_indent}  #{line}" }
+      result + " #{close}"
+    else
+      # Code prefix - new line format
+      result = "#{block.prefix}\n"
+      result += "#{base_indent}  #{open} #{normalized.first || ""}"
+      (normalized[1..-1] || []).each do |line|
+        result += "\n#{base_indent}    #{line}"
+      end
+      result + " #{close}"
+    end
+  end
+  
+  def matching_close(open)
+    open == '{' ? '}' : ')'
+  end
+end
+
+# Main processor
+class Processor
+  def initialize(source, options = {})
+    @source = source
+    @options = options
+    @tokens = OCamlLexer.new.parse(source)
+  end
+  
+  def process
+    blocks = BlockFinder.new(@tokens).find_all
+    format_output(blocks)
+  end
+  
+  private
+  
+  def format_output(blocks)
+    return @source if blocks.empty?
+    
+    formatter = LispFormatter.new
+    result = []
+    last_pos = 0
+    
+    blocks.each do |block|
+      result << reconstruct(@tokens[last_pos...block.start_pos])
+      result << formatter.format(block)
+      last_pos = block.end_pos + 1
+    end
+    
+    result << reconstruct(@tokens[last_pos..-1]) if last_pos < @tokens.length
+    result.join.rstrip + "\n"
+  end
+  
+  def reconstruct(tokens)
+    return "" unless tokens
+    tokens.map { |t| t.values.first.to_s }.join
+  end
+end
+
+# CLI
+def main
+  options = {}
+  
+  parser = OptionParser.new do |opts|
+    opts.banner = "Usage: #{$0} [options] file1.ml [file2.ml ...]"
+    
+    opts.on('--format', 'Format files in place') do
+      options[:format] = true
+    end
+    
+    opts.on('-h', '--help', 'Show this help') do
+      puts opts
+      exit
+    end
+  end
+  
+  parser.parse!
+  
+  if ARGV.empty?
+    puts parser
+    exit 1
+  end
+  
+  ARGV.each_with_index do |filename, index|
+    next unless File.exist?(filename)
+    
+    begin
+      source = File.read(filename)
+      source += "\n" unless source.end_with?("\n")
+      
+      output = Processor.new(source, options).process
+      
+      if options[:format]
+        File.write(filename, output)
+        STDERR.puts "✓ Formatted #{filename}"
+      else
+        puts "-" * 70 if index > 0
+        puts output
+      end
+      
+    rescue => e
+      STDERR.puts "Error in #{filename}: #{e.message}"
+      STDERR.puts e.backtrace.first(5)
+    end
+  end
+end
+
+main if __FILE__ == $0

@@ -1,0 +1,6 @@
+(executable
+ (name perms)
+ (modules perms parallel tarjan loops answers worker)
+ (libraries))
+
+(include_subdirs unqualified)

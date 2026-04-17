@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+# Nuclear cleanup script for Compare project
+# Finds and cleans all directories with modern run scripts
+
+set -euo pipefail
+
+# Get directory hash (including hidden files)
+dir_hash() {
+    (cd "$1" && ls -a | sort | md5)
+}
+
+# Find all run scripts with our signature in both source and archive/history
+{
+    find "${PROJECT_ROOT}/source" -name run -type f
+    find "${PROJECT_ROOT}/archive/history" -name run -type f
+} | while read -r script; do
+    # Extract language from signature if present
+    if grep -q "^# compare-run-script:" "$script"; then
+        lang=$(grep "^# compare-run-script:" "$script" | cut -d: -f2 | tr -d '[:space:]')
+        dir=$(dirname "$script")
+        relpath=${dir#"${PROJECT_ROOT}/"}
+        
+        # Hash before cleanup
+        before_hash=$(dir_hash "$dir")
+        
+        case "$lang" in
+            haskell)
+                rm -rf "$dir"/{hidir,arm64,perms,*.hi,*.o}
+                ;;
+            rust)
+                rm -rf "$dir"/target
+                ;;
+            # Add more languages as needed
+        esac
+        
+        # Hash after cleanup and report if changed
+        after_hash=$(dir_hash "$dir")
+        if [ "$before_hash" != "$after_hash" ]; then
+            echo "$relpath"
+        fi
+    fi
+done

@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+
+# swift
+# run [n] [prefix] [cores]
+
+n=${1:-}
+prefix=${2:-}
+cores=${3:-}
+
+cd "$(dirname "$0")"
+top=$(git rev-parse --show-toplevel)
+
+swift build -c release 2>&1 | grep -v "^Building" | grep -v "^Build complete" || exit 1
+
+"$top/bin/log-run" .build/release/perms $n $prefix $cores

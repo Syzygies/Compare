@@ -1,0 +1,48 @@
+# Ignore everything
+*
+
+# Allow these directories
+!source/
+!source/**
+!bin/
+!bin/**
+!doc/
+!doc/**
+
+# Allow these files
+!README.md
+!justfile
+!.gitignore
+
+# Still ignore build artifacts within allowed directories
+*.o
+*.hi
+*.cmi
+*.cmx
+*.olean
+*.trace
+*.pdf
+*.so
+*.prof
+*.numbers
+*.swp
+*~
+.DS_Store
+perms
+.scala-build/
+.bsp/
+.build/
+_build/
+*/target/
+target/
+dist-newstyle/
+hidir/
+arm64/
+.last-build-type
+Packages/
+xcuserdata/
+DerivedData/
+.swiftpm/
+.netrc
+source/F#/bin/
+source/F#/obj/

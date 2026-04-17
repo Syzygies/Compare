@@ -1,0 +1,107 @@
+#!/usr/bin/env ruby
+
+# Configuration flags
+CHECK_DUPLICATES = false  # Set to true if duplicate detection needed (e.g., after bulk imports)
+
+# for debugging:
+# find . -name perms.hs -exec shasum -a 256 {} \; | sort
+
+require 'digest'
+
+def usage
+  puts <<~USAGE
+    Usage: #{File.basename($0)} language
+      language: haskell, rust, etc.
+      Shows sequential diffs of all versions using Kaleidoscope
+  USAGE
+  exit 1
+end
+
+EXTENSIONS = {
+  'haskell' => 'hs',
+  'rust' => 'rs',
+  'ruby' => 'rb',
+  'swift' => 'swift',
+  'ocaml' => 'ml',
+  'lean' => 'lean'
+}
+
+def compute_hash(file)
+  Digest::SHA256.hexdigest(File.read(file))
+end
+
+def show_tree(lang)
+  system "tree archive/history/#{lang}"
+end
+
+usage if ARGV.empty?
+lang = ARGV[0].downcase
+unless EXTENSIONS.key?(lang)
+  puts "Error: Unsupported language. Must be one of: #{EXTENSIONS.keys.join(', ')}"
+  exit 1
+end
+
+base = "archive/history/#{lang}"
+ext = EXTENSIONS[lang]
+
+# Get all version directories in order
+dirs = Dir["#{base}/v*"].sort_by do |path|
+  path.match(/v(\d+)/)[1].to_i
+end
+
+if dirs.length < 2
+  puts "Error: Need at least 2 versions of #{lang} to compare"
+  exit 1
+end
+
+# Check for duplicates
+if CHECK_DUPLICATES
+  puts "Checking for duplicates..."
+  hashes = {}
+  dirs.each do |dir|
+    file = "#{dir}/perms.#{ext}"
+    hash = compute_hash(file)
+    hashes[hash] ||= []
+    hashes[hash] << dir
+  end
+
+  # Find first set of duplicates (if any)
+  duplicate_set = hashes.values.find { |dirs| dirs.size > 1 }
+  if duplicate_set
+    puts "\nBefore cleanup:"
+    show_tree(lang)
+    
+    versions = duplicate_set.map { |d| d.match(/v(\d+)/)[1] }
+    puts "\nFound duplicate versions: #{versions.join(' and ')} are identical"
+    puts "Will keep v#{versions.min} and remove #{versions.size > 2 ? 'all later duplicates' : 'the later duplicate'}"
+    
+    # Keep earliest version
+    keep = duplicate_set.min_by { |d| d.match(/v(\d+)/)[1].to_i }
+    (duplicate_set - [keep]).each do |dir|
+      system "rm -rf #{dir}"
+    end
+    
+    # Renumber remaining versions
+    remaining = Dir["#{base}/v*"].sort_by { |d| d.match(/v(\d+)/)[1].to_i }
+    remaining.each_with_index do |dir, i|
+      new_dir = "#{base}/v#{i+1}-#{dir.split('-')[1]}"
+      system "mv #{dir} #{new_dir}" unless dir == new_dir
+    end
+    
+    puts "\nAfter cleanup:"
+    show_tree(lang)
+    puts "\nPlease rerun spelunk to check for more duplicates"
+    exit 0
+  end
+end
+
+# Compare each adjacent pair
+dirs.each_cons(2) do |prev, curr|
+  prev_ver = prev.match(/v(\d+)/)[1]
+  curr_ver = curr.match(/v(\d+)/)[1]
+  
+  puts "\nComparing #{lang} v#{prev_ver} → v#{curr_ver}"
+  puts "Press Ctrl-C to stop"
+  
+  system "ksdiff #{prev}/perms.#{ext} #{curr}/perms.#{ext}"
+end

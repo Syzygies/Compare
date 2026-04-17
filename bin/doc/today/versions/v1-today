@@ -1,0 +1,133 @@
+#!/usr/bin/env bash
+# January 25, 2025
+# Windsurf, Cascade
+
+set -euo pipefail
+
+# Ensure we have PROJECT_ROOT
+if [ -z "${PROJECT_ROOT:-}" ]; then
+    echo "ERROR: PROJECT_ROOT environment variable not set"
+    exit 1
+fi
+
+cd "$PROJECT_ROOT"
+
+# Get current date components
+YEAR=$(date +%Y)
+MONTH_DAY=$(date +%m-%d)
+
+# Create archive directory structure
+ARCHIVE_ROOT="$PROJECT_ROOT/archive/$YEAR/$MONTH_DAY/context"
+mkdir -p "$ARCHIVE_ROOT"
+
+# Create default markdown files if they don't exist
+touch "$ARCHIVE_ROOT/lessons.md"
+touch "$ARCHIVE_ROOT/quotes.md"
+touch "$ARCHIVE_ROOT/task.md"
+
+# Starting from year directory, but excluding today's folder:
+# 1. Remove all index.txt files (they'll be regenerated)
+find "$PROJECT_ROOT/archive/$YEAR" -type f -name "index.txt" -delete
+
+# 2. Delete zero-length files (excluding today's folder)
+find "$PROJECT_ROOT/archive/$YEAR" -type f -empty -not -path "*/$MONTH_DAY/*" -delete
+
+# 3. Delete empty directories (excluding today's folder)
+find "$PROJECT_ROOT/archive/$YEAR" -type d -empty -not -path "*/$MONTH_DAY/*" -delete 2>/dev/null || true
+
+# 4. Generate new index.txt for each context directory (including today's)
+while IFS= read -r dir; do
+    # Only create index if directory has files
+    if [ -n "$(ls -A "$dir")" ]; then
+        (cd "$dir" && {
+            echo "# Read these files. Do not edit this index, which is auto-generated."
+            echo
+            ls -p | grep -v '/$' | grep -v '^index.txt$'
+        } > index.txt)
+    fi
+done < <(find "$PROJECT_ROOT/archive/$YEAR" -type d -name "context")
+
+: << 'EOC'
+Create a daily workspace in archive/YYYY/MM-DD/context/ with three starter files:
+- lessons.md
+- quotes.md
+- task.md
+
+Each context/ directory will have an auto-generated index.txt that looks like:
+
+# Read these files. Do not edit this index, which is auto-generated.
+
+lessons.md
+quotes.md
+task.md
+
+Then maintain the archive/YYYY/ tree (where YYYY is the current year):
+
+1. First pass (cleanup old empty items, excluding today's folder):
+   - Delete all index.txt files (they'll be regenerated)
+   - Remove any zero-length files 
+   - Remove any empty directories
+
+2. Second pass (generate fresh indexes):
+   - For EVERY context/ directory (including today's):
+     - If directory contains files, create index.txt listing them
+     - index.txt should exclude itself from the listing
+     - List only files (not directories)
+     - Files starting with = will sort first naturally
+
+Key requirements:
+- Must work from any directory (use $PROJECT_ROOT)
+- Must never touch anything outside archive/YYYY/
+- Must preserve non-empty files in today's folder
+- Must handle paths with spaces correctly
+
+The script maintains a clean archive tree where:
+- Empty files and directories are removed (except in today's folder)
+- Each populated context/ has an accurate index.txt of its contents
+
+Example tree showing both input and desired output:
+
+Input:
+archive/2025/
+├── 01-14/
+│   └── context/
+│       ├── =overview.md        [content]
+│       ├── drawing.png         [content]
+│       ├── notes.md            [content]
+│       └── task.md             [empty]
+├── 01-15/
+│   └── context/                [empty dir]
+├── 01-16/
+│   └── context/
+│       ├── notes.md            [content]
+│       └── index.txt           [old]
+└── 01-17/                      [today]
+    └── context/
+        ├── lessons.md          [empty]
+        ├── quotes.md           [empty]
+        └── task.md             [empty]
+
+Output:
+archive/2025/
+├── 01-14/
+│   └── context/
+│       ├── =overview.md
+│       ├── drawing.png
+│       ├── notes.md
+│       └── index.txt           [lists =overview.md, drawing.png, notes.md]
+├── 01-16/
+│   └── context/
+│       ├── notes.md
+│       └── index.txt           [lists notes.md]
+└── 01-17/                      [today]
+    └── context/
+        ├── lessons.md          [preserved]
+        ├── quotes.md           [preserved]
+        └── task.md             [preserved]
+
+Changes shown:
+- 01-14: empty task.md removed, index.txt created with all file types
+- 01-15: empty directory removed
+- 01-16: old index.txt replaced
+- 01-17: empty files preserved (today), index.txt lists all files
+EOC

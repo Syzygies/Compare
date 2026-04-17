@@ -1,0 +1,86 @@
+#!/usr/bin/env ruby
+
+require 'pathname'
+require 'open3'
+
+def get_changed_paths
+  stdout, _, _ = Open3.capture3('git status --porcelain')
+  stdout.lines.map { |line| line[3..-1]&.strip }.compact
+rescue
+  []
+end
+
+def parent_directories(paths)
+  paths
+    .map { |path| Pathname.new(path).dirname.to_s }
+    .uniq
+    .reject { |path| path == '.' || path.empty? }
+    .push('.')
+end
+
+def detect_editor
+  # Get the currently focused application's bundle ID
+  bundle_id = `osascript -e 'tell application "System Events" to get bundle identifier of (first application process whose frontmost is true)'`.strip
+  puts "\nDetected bundle identifier: #{bundle_id}"
+  
+  case bundle_id
+  when 'com.todesktop.230313mzl4w4u92'
+    'Cursor'
+  when 'com.microsoft.VSCode'
+    'Visual Studio Code'
+  when 'com.exafunction.windsurf'
+    'Windsurf'
+  else
+    bundle_id  # Fallback to the bundle ID itself
+  end
+end
+
+def refresh_directory(path)
+  script = <<~APPLESCRIPT
+    tell application "Finder"
+      activate
+      set targetFolder to POSIX file "#{File.expand_path(path)}" as alias
+      open targetFolder
+      delay 0.1
+      close window 1
+    end tell
+  APPLESCRIPT
+  system('osascript', '-e', script, out: '/dev/null', err: '/dev/null')
+end
+
+def focus_editor(editor_name)
+  puts "\nReturning focus to #{editor_name}"
+  script = <<~APPLESCRIPT
+    tell application "#{editor_name}"
+      activate
+    end tell
+  APPLESCRIPT
+  system('osascript', '-e', script, out: '/dev/null', err: '/dev/null')
+end
+
+def cleanup_finder
+  script = <<~APPLESCRIPT
+    tell application "Finder"
+      close every window
+    end tell
+  APPLESCRIPT
+  system('osascript', '-e', script, out: '/dev/null', err: '/dev/null')
+end
+
+if ARGV[0] == 'cleanup'
+  cleanup_finder
+  exit
+end
+
+Dir.chdir(ENV['top'] || Dir.pwd) do
+  # Detect editor before changing any focus
+  editor_name = detect_editor
+  
+  dirs = parent_directories(get_changed_paths)
+  puts "\n"
+  dirs.each do |dir|
+    refresh_directory(dir)
+    puts dir
+  end
+  focus_editor(editor_name)
+end

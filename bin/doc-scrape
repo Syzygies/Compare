@@ -1,0 +1,173 @@
+#!/usr/bin/env ruby
+
+require 'nokogiri'
+require 'fileutils'
+require 'open-uri'
+require 'set'
+require 'uri'
+require_relative 'common'
+
+# Documentation sources configuration
+# Each url must end with '/' to ensure wget treats them as directories
+DOC_SOURCES = {
+  'lean' => {
+    'url' => 'https://lean-lang.org/',
+    'fetch_path' => 'ref/fetched/lean-lang.org',
+    'extract_path' => 'ref/extracted/lean-lang.org',
+    'description' => 'Full Lean 4 documentation'
+  },
+  'fp' => {
+    'url' => 'https://lean-lang.org/functional_programming_in_lean/',
+    'fetch_path' => 'ref/fetched/lean-lang.org/functional_programming_in_lean',
+    'extract_path' => 'ref/extracted/lean-lang.org/functional_programming_in_lean',
+    'description' => 'Functional Programming in Lean book (large test case)'
+  },
+  'blog' => {
+    'url' => 'https://lean-lang.org/blog/',
+    'fetch_path' => 'ref/fetched/lean-blog',
+    'extract_path' => 'ref/extracted/lean-blog',
+    'description' => 'Blog section (medium test case with nested directories)'
+  },
+  'test' => {
+    'url' => 'https://lean-lang.org/people/',
+    'fetch_path' => 'ref/fetched/lean-test',
+    'extract_path' => 'ref/extracted/lean-test',
+    'description' => 'People page (smallest test case)'
+  }
+}
+
+# File types that wget can reliably detect and skip
+WGET_SKIP_EXTENSIONS = %w[pdf ttf otf woff woff2 eot]
+
+# File types that need our sophisticated extension detection
+# Currently only skip html? files, keeping svg? for analysis
+OUR_SKIP_EXTENSIONS = %w[html?]  # Keeping svg? for now
+
+# All paths are relative to project root
+LOG_PATH = 'ref/fetched/download.log'
+LOG_FILE = File.join(ENV['top'], LOG_PATH)
+
+# Main processing class
+class DocProcessor
+  def initialize(fetch_dir, extract_dir)
+    @fetch_dir = fetch_dir
+    @extract_dir = extract_dir
+  end
+
+  def process
+    puts "Processing documentation..."
+    puts "Input directory: #{@fetch_dir}"
+    puts "Output directory: #{@extract_dir}"
+  end
+end
+
+def cleanup_unwanted_files(dir)
+  total_size = 0
+  Dir.glob("#{dir}/**/*").each do |file|
+    next unless File.file?(file)
+    if Common::Extensions.matches_any?(file, OUR_SKIP_EXTENSIONS)
+      total_size += File.size(file)
+      File.delete(file)
+    end
+  end
+  total_size
+end
+
+def show_sources
+  puts
+  puts "Available documentation sources:"
+  DOC_SOURCES.each do |key, config|
+    puts "  #{key}: #{config['description']}"
+  end
+  puts "\nUsage: #{File.basename($0)} --download SOURCE"
+  exit 1
+end
+
+def download_directories(source_key)
+  config = DOC_SOURCES[source_key]
+  unless config
+    puts
+    puts "I don't know about a source called '#{source_key}'"
+    puts "Here are the sources I know about:"
+    show_sources
+    return
+  end
+
+  fetch_dir = File.join(ENV['top'], config['fetch_path'])
+  FileUtils.mkdir_p(fetch_dir)
+  
+  # Check if directory exists and is not empty
+  if Dir.exist?(fetch_dir) && !Dir.empty?(fetch_dir)
+    puts
+    puts "The directory #{fetch_dir} already has content."
+    puts "Use 'rake remove #{source_key}' to clear it before downloading."
+    return  # Just return, don't exit with error
+  end
+  
+  source_uri = URI.parse(config['url'])
+  
+  # Simpler URL pattern matching:
+  # - For root URL (/), match anything under the domain
+  # - For subdirectory URL (/path/), match anything under that path
+  # No need to escape slashes as they're part of the URL structure
+  accept_pattern = source_uri.path == "/" ? 
+                  "^#{source_uri.scheme}://#{source_uri.host}/.*" :
+                  "^#{source_uri.scheme}://#{source_uri.host}#{source_uri.path}.*"
+  
+  # Download with wget
+  system("wget", "-r", "-np", "-nH",
+         "--adjust-extension",  # Force proper directory/index.html structure
+         "--html-extension",    # Keep .html extension on HTML files
+         "--domains=#{source_uri.host}",
+         "--reject=#{WGET_SKIP_EXTENSIONS.join(',')}",
+         "--accept-regex=#{accept_pattern}",
+         "-P", fetch_dir, config['url'],
+         [:out, :err] => LOG_FILE)
+
+  # Clean up html? files
+  cleanup_unwanted_files(fetch_dir)
+end
+
+# Program entry point
+if __FILE__ == $0
+  def show_usage
+    puts
+    puts "Usage: #{File.basename($0)} [option] [source]"
+    puts
+    puts "Options:"
+    puts "  --download     Download documentation from specified source"
+    puts "  --process      Process downloaded files into formatted documentation"
+    puts "  --help         Show this help message"
+    puts
+    puts "Sources:"
+    show_sources
+  end
+
+  case ARGV[0]
+  when '--download'
+    if ARGV[1]
+      download_directories(ARGV[1])
+    else
+      show_sources
+    end
+  when '--process'
+    if ARGV[1]
+      config = DOC_SOURCES[ARGV[1]]
+      unless config
+        puts
+        puts "Error: Unknown source '#{ARGV[1]}'"
+        show_sources
+      end
+      fetch_dir = File.join(ENV['top'], config['fetch_path'])
+      extract_dir = File.join(ENV['top'], config['extract_path'])
+      processor = DocProcessor.new(fetch_dir, extract_dir)
+      processor.process
+    else
+      puts
+      puts "Error: Please specify a source to process"
+      show_sources
+    end
+  else
+    show_usage
+  end
+end

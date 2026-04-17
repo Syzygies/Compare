@@ -1,0 +1,59 @@
+#!/usr/bin/env ruby
+
+require 'fileutils'
+
+def analyze_directory(path)
+  subdirs = Hash.new { |h, k| h[k] = { count: 0, size: 0 } }
+  
+  # Get only top-level subdirectories
+  Dir.entries(path).each do |entry|
+    full_path = File.join(path, entry)
+    next unless File.directory?(full_path)
+    next if entry.start_with?('.')  # Skip hidden directories
+    
+    # For each subdir, recursively get all files
+    Dir.glob("#{full_path}/**/*").each do |file|
+      next unless File.file?(file)
+      subdirs[entry][:count] += 1
+      subdirs[entry][:size] += File.size(file)
+    end
+  end
+  
+  # Print header with spacing
+  puts
+  puts "Subdirectory sizes in: #{path}"
+  puts
+  
+  # Prepare all output
+  output = []
+  output << "Directory | Size (MB) | Count | Avg (MB)"
+  
+  # Sort by size in descending order
+  subdirs.to_a.sort_by { |_, stats| -stats[:size] }.each do |dir, stats|
+    avg_size = stats[:size] / stats[:count]
+    output << "#{dir} | #{human_size_mb(stats[:size])} | #{stats[:count]} | #{human_size_mb(avg_size)}"
+  end
+
+  # Get formatted table
+  formatted = IO.popen(['column', '-t', '-s', '|'], 'w+') do |io|
+    io.puts output
+    io.close_write
+    io.read
+  end
+
+  # Print with blank line after header
+  puts formatted.lines.first
+  puts
+  print formatted.lines.drop(1).join
+end
+
+def human_size_mb(bytes)
+  sprintf("%.2f", bytes / 1024.0 / 1024.0)
+end
+
+if ARGV.empty?
+  puts "Usage: #{$0} <directory>"
+  exit 1
+end
+
+analyze_directory(ARGV[0])

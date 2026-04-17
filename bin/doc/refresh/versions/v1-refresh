@@ -1,0 +1,88 @@
+#!/usr/bin/env ruby
+# Refresh Cursor's file explorer view by briefly revealing Git-tracked changed directories
+# in Finder, which triggers Cursor's refresh mechanism.
+#
+# Usage:
+#   refresh          # refresh Cursor's file view
+#   refresh cleanup  # close any Finder windows inside current Git project
+
+require 'pathname'
+require 'open3'
+
+class CursorRefresh
+  def initialize
+    @project_root = Pathname.new(ENV['PROJECT_ROOT'])
+  end
+
+  def refresh
+    puts
+    changed_dirs.each do |dir|
+      path = dir.relative_path_from(@project_root)
+      puts path
+      open_and_close_finder(dir)
+    end
+    restore_cursor_focus
+  end
+
+  def cleanup
+    close_project_windows
+    restore_cursor_focus
+  end
+
+  private
+
+  def changed_dirs
+    stdout, = Open3.capture2('git', 'status', '--porcelain')
+    stdout.lines.map do |line|
+      file_path = line[3..-1].strip
+      (@project_root + file_path).dirname
+    end.uniq
+  end
+
+  def open_and_close_finder(dir)
+    script = <<~APPLESCRIPT
+      tell application "Finder"
+        activate
+        set targetFolder to POSIX file "#{dir}" as alias
+        open targetFolder
+        delay 0.1
+        close window 1
+      end tell
+    APPLESCRIPT
+    system('osascript', '-e', script)
+  end
+
+  def close_project_windows
+    script = <<~APPLESCRIPT
+      tell application "Finder"
+        set projectPath to POSIX file "#{@project_root}" as alias
+        repeat with w in (windows)
+          if exists w then
+            set winPath to (POSIX path of (target of w as alias))
+            if winPath starts with "#{@project_root}" then
+              close w
+            end if
+          end if
+        end repeat
+      end tell
+    APPLESCRIPT
+    system('osascript', '-e', script, out: File::NULL)
+  end
+
+  def restore_cursor_focus
+    script = <<~APPLESCRIPT
+      tell application "Cursor" to activate
+    APPLESCRIPT
+    system('osascript', '-e', script)
+  end
+end
+
+refresher = CursorRefresh.new
+if ARGV.empty?
+  refresher.refresh
+elsif ARGV == ['cleanup']
+  refresher.cleanup
+else
+  puts "Argument error: Please use either 'refresh' or 'refresh cleanup'"
+  exit 1
+end

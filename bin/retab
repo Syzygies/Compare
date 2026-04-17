@@ -1,0 +1,108 @@
+#!/usr/bin/env ruby
+
+# Retab a file using consistent n-space indentation
+# Usage: retab file n
+
+if ARGV.length != 2
+  STDERR.puts "Usage: retab file n"
+  STDERR.puts "  file - path to file to retab"
+  STDERR.puts "  n - spaces per tab stop"
+  exit 1
+end
+
+filename = ARGV[0]
+spaces_per_tab = ARGV[1].to_i
+
+unless File.exist?(filename)
+  STDERR.puts "Error: File not found: #{filename}"
+  exit 1
+end
+
+if spaces_per_tab < 1
+  STDERR.puts "Error: Spaces per tab must be at least 1"
+  exit 1
+end
+
+# Read all lines
+lines = File.readlines(filename)
+
+# Process lines to determine tab depths
+processed_lines = []
+tab_stack = [0]  # Stack of indentation levels (in spaces)
+errors = []
+
+lines.each_with_index do |line, idx|
+  # Strip trailing whitespace but preserve line ending
+  line_ending = line[/\r?\n?$/]
+  line = line.rstrip
+  
+  # Handle blank lines
+  if line.empty?
+    processed_lines << { text: "", depth: nil, ending: line_ending }
+    next
+  end
+  
+  # Count leading spaces
+  leading_spaces = line[/\A */].length
+  stripped_line = line[leading_spaces..-1]
+  
+  # Find or set the tab depth
+  if leading_spaces > tab_stack.last
+    # Deeper indentation - push new level
+    tab_stack.push(leading_spaces)
+    tab_depth = tab_stack.length - 1
+  elsif leading_spaces == tab_stack.last
+    # Same indentation
+    tab_depth = tab_stack.length - 1
+  else
+    # Less indentation - pop stack to find level
+    while tab_stack.length > 1 && tab_stack.last > leading_spaces
+      tab_stack.pop
+    end
+    
+    if tab_stack.last == leading_spaces
+      tab_depth = tab_stack.length - 1
+    else
+      errors << "Line #{idx + 1}: Indentation of #{leading_spaces} spaces doesn't match any previous level (stack: #{tab_stack.inspect})"
+      break
+    end
+  end
+  
+  processed_lines << { 
+    text: stripped_line, 
+    depth: tab_depth, 
+    ending: line_ending,
+    original_spaces: leading_spaces 
+  }
+end
+
+# Report first error if any
+if errors.any?
+  STDERR.puts "Error during analysis:"
+  STDERR.puts errors.first
+  exit 1
+end
+
+# Generate retabbed output
+output_lines = processed_lines.map do |line_info|
+  if line_info[:depth].nil?
+    # Blank line
+    line_info[:text] + line_info[:ending]
+  else
+    # Apply new indentation
+    new_indent = " " * (line_info[:depth] * spaces_per_tab)
+    new_indent + line_info[:text] + line_info[:ending]
+  end
+end
+
+# Write back to file
+File.write(filename, output_lines.join)
+
+# Report success
+indent_changes = processed_lines.count do |line| 
+  line[:depth] && line[:original_spaces] != line[:depth] * spaces_per_tab
+end
+
+puts "✓ Retabbed #{filename} with #{spaces_per_tab} spaces per tab"
+puts "  #{processed_lines.count { |l| l[:depth] }} non-blank lines"
+puts "  #{indent_changes} lines with changed indentation"

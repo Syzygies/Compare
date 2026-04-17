@@ -1,0 +1,75 @@
+#!/usr/bin/env ruby
+
+require 'pathname'
+require 'open3'
+
+def get_changed_paths
+  cmd = "git status --porcelain"
+  stdout, stderr, status = Open3.capture3(cmd)
+  
+  return [] unless status.success?
+  
+  stdout.lines.map do |line|
+    line.strip.split(/\s+/, 2).last
+  end
+end
+
+def get_unique_parent_dirs(paths)
+  dirs = paths.map { |p| Pathname.new(p).dirname.to_s }.uniq
+  dirs << "." if paths.any? { |p| Pathname.new(p).dirname.to_s == "." }
+  dirs.sort
+end
+
+def refresh_in_finder(dir)
+  script = <<~APPLESCRIPT
+    tell application "Finder"
+      activate
+      set targetFolder to POSIX file "#{Dir.pwd}/#{dir}" as alias
+      open targetFolder
+      delay 0.1
+      close window 1
+    end tell
+  APPLESCRIPT
+  
+  system('osascript', '-e', script, [:out, :err] => '/dev/null')
+end
+
+def cleanup_finder
+  script = <<~APPLESCRIPT
+    tell application "Finder"
+      set projectPath to POSIX file "#{Dir.pwd}" as alias
+      set wins to every window whose (target's POSIX path contains "#{Dir.pwd}")
+      repeat with w in wins
+        close w
+      end repeat
+    end tell
+  APPLESCRIPT
+  
+  system('osascript', '-e', script, [:out, :err] => '/dev/null')
+end
+
+def focus_cursor
+  script = <<~APPLESCRIPT
+    tell application "Cursor" to activate
+  APPLESCRIPT
+  
+  system('osascript', '-e', script, [:out, :err] => '/dev/null')
+end
+
+# Main execution
+if ARGV[0] == "cleanup"
+  cleanup_finder
+  exit 0
+end
+
+puts
+
+changed_paths = get_changed_paths
+dirs = get_unique_parent_dirs(changed_paths)
+
+dirs.each do |dir|
+  puts dir
+  refresh_in_finder(dir)
+end
+
+focus_cursor 

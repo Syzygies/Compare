@@ -1,0 +1,160 @@
+#!/usr/bin/env bash
+# January 25, 2025
+# Windsurf, Cascade
+
+set -euo pipefail
+
+# Ensure we're operating from the project root
+cd "$(dirname "$0")/.."
+PROJECT_ROOT="$(pwd)"
+
+# Get today's date components
+YEAR=$(date +%Y)
+DATE=$(date +%m-%d)
+TODAY_DIR="archive/$YEAR/$DATE"
+CONTEXT_DIR="$TODAY_DIR/context"
+
+# Create today's workspace if it doesn't exist
+mkdir -p "$CONTEXT_DIR"
+
+# Create starter files if they don't exist
+for file in lessons.md quotes.md task.md; do
+    touch "$CONTEXT_DIR/$file"
+done
+
+# Function to generate index.txt for a context directory
+generate_index() {
+    local dir="$1"
+    local index_file="$dir/index.txt"
+    
+    # Only proceed if directory has files
+    if [ -n "$(find "$dir" -maxdepth 1 -type f ! -name 'index.txt')" ]; then
+        {
+            echo "# Read these files. Do not edit this index, which is auto-generated."
+            echo
+            # Use find with -exec basename to get filenames, then sort
+            find "$dir" -maxdepth 1 -type f ! -name 'index.txt' -exec basename {} \; | sort
+        } > "$index_file"
+    fi
+}
+
+# Clean up archive for current year (excluding today's folder)
+if [ -d "archive/$YEAR" ]; then
+    find "archive/$YEAR" -type f -name 'index.txt' -delete
+    
+    # Remove empty files (excluding today's directory)
+    find "archive/$YEAR" -type f -empty -not -path "$TODAY_DIR/*" -delete
+    
+    # Remove empty directories (excluding today's directory)
+    find "archive/$YEAR" -type d -empty -not -path "$TODAY_DIR" -not -path "$TODAY_DIR/*" -delete
+fi
+
+# Generate fresh indexes for all context directories
+find "archive/$YEAR" -type d -name 'context' -print0 | while IFS= read -r -d '' dir; do
+    generate_index "$dir"
+done
+
+# Store the original prompt as heredoc
+cat > "$PROJECT_ROOT/bin/today.prompt" << 'EOD'
+Please turn this prompt into a working script, including the entire prompt as a heredoc at the end.
+Ask questions if anything is unclear; do not jump based on guesses that could be wrong.
+If you feel that the prompt could be improved, please revise it.
+The test will be whether other AI models can one-shot a working script based on your experience.
+If you decide to simplify this prompt and then future AIs struggle, it will reflect on you not them.
+
+Create a daily workspace in archive/YYYY/MM-DD/context/ with three starter files:
+- lessons.md
+- quotes.md
+- task.md
+
+Each context/ directory will have an auto-generated index.txt that looks like:
+
+# Read these files. Do not edit this index, which is auto-generated.
+
+lessons.md
+quotes.md
+task.md
+
+Then maintain the archive/YYYY/ tree (where YYYY is the current year):
+
+1. First pass (cleanup old empty items, excluding today's folder):
+   - Delete all index.txt files (they'll be regenerated)
+   - Remove any zero-length files 
+   - Remove any empty directories
+
+2. Second pass (generate fresh indexes):
+   - For EVERY context/ directory (including today's):
+     - If directory contains files, create index.txt listing them
+     - index.txt should exclude itself from the listing
+     - List only files (not directories)
+     - Files starting with = will sort first naturally
+
+Key requirements:
+- Must work on macOS (BSD userland, no GNU extensions like find -printf)
+- Must work from any directory (script should cd to its location first)
+- Must use $PROJECT_ROOT (obtained via dirname/pwd after cd)
+- Must fail fast and explicitly (use set -euo pipefail)
+- Must handle paths with spaces and special characters correctly
+- Must never touch anything outside archive/YYYY/
+- Must preserve non-empty files in today's folder
+- Must create archive/YYYY directory if it doesn't exist
+- Should run silently unless there's an error
+
+File handling specifics:
+- New files should preserve default timestamps (don't use touch -t)
+- Running multiple times in a day should be idempotent
+- Should handle filenames with spaces, =, or other special chars
+- Should properly handle symlinks if encountered
+
+Example tree showing both input and desired output:
+
+Input:
+archive/2025/
+├── 01-14/
+│   └── context/
+│       ├── =overview.md        [content]
+│       ├── drawing.png         [content]
+│       ├── notes.md            [content]
+│       └── task.md             [empty]
+├── 01-15/
+│   └── context/                [empty dir]
+├── 01-16/
+│   └── context/
+│       ├── notes.md            [content]
+│       └── index.txt           [old]
+└── 01-17/                      [today]
+    └── context/
+        ├── lessons.md          [empty]
+        ├── quotes.md           [empty]
+        └── task.md             [empty]
+
+Output:
+archive/2025/
+├── 01-14/
+│   └── context/
+│       ├── =overview.md
+│       ├── drawing.png
+│       ├── notes.md
+│       └── index.txt           [lists =overview.md, drawing.png, notes.md]
+├── 01-16/
+│   └── context/
+│       ├── notes.md
+│       └── index.txt           [lists notes.md]
+└── 01-17/                      [today]
+    └── context/
+        ├── lessons.md          [preserved]
+        ├── quotes.md           [preserved]
+        └── task.md             [preserved]
+
+Changes shown:
+- 01-14: empty task.md removed, index.txt created with all file types
+- 01-15: empty directory removed
+- 01-16: old index.txt replaced
+- 01-17: empty files preserved (today), index.txt lists all files
+
+Test cases to verify:
+1. Run from different directory: cd /tmp && /path/to/bin/today
+2. Special characters: touch "archive/2025/01-14/context/= notes & stuff.md"
+3. Script must be idempotent: running it multiple times (./today && ./today) should produce identical results with no side effects
+4. Verify no GNU dependencies: shellcheck --shell=bash ./today
+EOD

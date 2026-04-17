@@ -1,0 +1,46 @@
+We just added the language Julia. Like other languages, there's a question of whether the supervisor thread joins in to work, or waits as idle as possible. This impinges on how to code using the core count of 12 performance cores on my M4 Mac Studio.
+
+In most languages, my experience if we code 12 worker threads to do actual work, and leave the main thread to wait idly till the workers are done, then the Activity Monitor CPU Usage meter lights up 13 bars. All 12 performance cores go 100% and one efficiency core goes 80%. Accordingly I substracted 1 from cores, to keep the metering all in the performance cores.
+
+This may be an instrumentation issue mirage. I may be thinking about this wrong. In general I want to have long running math computations on all my performance cores, and still have a usable machine for general GUI interaction, checking mail... Having an idle main "come into the efficiency tent" may not be such a burden as the CPU meter suggests.
+
+I have timing data for Julia, 10-14 cores, where we do now subtract one, so 12 cores means I see 12 bars max out. That doesn't tell us what's actually going on!
+
+m cores means m-1 equal hard threads and 1 easy thread. We should be able to see good scaling until we try to put a hard thread on an efficiency core.
+
+What do you see in these wall times?
+
+Julia, Tarjan, n=10
+10 40.44
+11 36.70
+12 33.39
+13 31.74
+14 30.30
+
+Julia, Loops, n=10
+10 19.14
+11 17.35
+12 15.95
+13 15.11
+14 14.54
+
+OCaml, Tarjan, n=10
+10 54.77
+11 50.05
+12 45.99
+13 43.48
+14 42.06
+
+OCaml, Loops, n=10
+10  33.68
+11  30.56
+12  27.62
+13  26.56
+14  25.21
+
+OCaml v6 (Istanbul), Loops, n=10
+10 30.52
+11 27.61
+12 26.20
+13 25.37
+14 24.54

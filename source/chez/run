@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+
+# chez
+# run [n] [prefix] [cores]
+
+n=${1:-}
+prefix=${2:-}
+cores=${3:-}
+
+cd "$(dirname "$0")"
+top=$(git rev-parse --show-toplevel)
+
+chez --script build.ss > /dev/null
+
+"$top/bin/log-run" "chez --libdirs ./_build --program _build/perms.so --" $n $prefix $cores

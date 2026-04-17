@@ -1,0 +1,229 @@
+#!/usr/bin/env ruby
+
+require 'etc'
+
+DEFAULT_LANGUAGES = %w[ocaml C++ F# nim rust swift chez julia haskell scala]
+
+# Discover available languages from source directory
+def discover_languages
+  Dir.glob('source/*').select { |f| File.directory?(f) }
+    .map { |dir| File.basename(dir) }
+    .reject { |name| name == 'ruby' }  # Ruby is too slow for benchmarking
+    .sort
+end
+
+# Get default number of performance cores
+def default_cores
+  # macOS specific - tries to get performance core count
+  if RUBY_PLATFORM.include?('darwin')
+    output = `sysctl -n hw.perflevel0.physicalcpu 2>/dev/null`.strip
+    return output.to_i if output.to_i > 0
+  end
+  # Fallback to total processor count
+  Etc.nprocessors
+end
+
+# Parse a range/comma-separated list of integers
+def parse_int_list(str)
+  result = []
+  str.split(',').each do |part|
+    if part.include?('-')
+      left, right = part.split('-', 2)
+      range = (left.to_i..right.to_i).to_a
+      result.concat(range)
+    else
+      result << part.to_i
+    end
+  end
+  result.uniq.sort
+end
+
+# Parse command line arguments
+def parse_args(args)
+  # Defaults
+  algorithms = %w[Loops Tarjan]
+  iterations = 1
+  available_languages = discover_languages
+  languages = DEFAULT_LANGUAGES.dup
+  using_default_languages = true
+  n_values = [9]
+  prefix_values = [3]
+  cores_values = [default_cores]
+  
+  # Convert all args to lowercase for case-insensitive parsing
+  args = args.map(&:downcase)
+  
+  # Track position - once we hit a number, we're in n/prefix/cores territory
+  in_params = false
+  param_index = 0
+  
+  i = 0
+  while i < args.length
+    arg = args[i]
+    
+    # Check if this is a number (starts param section)
+    if arg =~ /^\d+(-\d+)?(,\d+(-\d+)?)*$/
+      in_params = true
+      case param_index
+      when 0
+        n_values = parse_int_list(arg)
+      when 1
+        prefix_values = parse_int_list(arg)
+      when 2
+        cores_values = parse_int_list(arg)
+      else
+        abort "Error: Too many numeric parameters"
+      end
+      param_index += 1
+    elsif !in_params
+      # Still in options section
+      case arg
+      when 't', 'tarjan'
+        algorithms = %w[Tarjan]
+      when 'l', 'loops'
+        algorithms = %w[Loops]
+      when /^x(\d+)$/
+        iterations = $1.to_i
+      when /^(\d+)x$/
+        iterations = $1.to_i
+      else
+        # Check if it's a language name
+        matching_lang = available_languages.find { |lang| lang.downcase == arg }
+        if matching_lang
+          if using_default_languages
+            languages = [matching_lang]
+            using_default_languages = false
+          else
+            languages << matching_lang unless languages.include?(matching_lang)
+          end
+        else
+          abort "Error: Unknown option or language: #{args[i]} (original case)"
+        end
+      end
+    else
+      abort "Error: Unexpected argument after numeric parameters: #{args[i]} (original case)"
+    end
+    
+    i += 1
+  end
+  
+  # Filter languages to only those that exist
+  languages = languages.select { |lang| available_languages.map(&:downcase).include?(lang.downcase) }
+  languages = languages.map { |lang| available_languages.find { |l| l.downcase == lang.downcase } }
+  
+  # Validate ranges
+  n_values.each do |n|
+    abort "Error: n must be between 1 and 12, got #{n}" unless (1..12).include?(n)
+  end
+  
+  prefix_values.each do |prefix|
+    abort "Error: prefix must be >= 1, got #{prefix}" unless prefix >= 1
+  end
+  
+  # Validate prefix <= n for all combinations
+  n_values.each do |n|
+    prefix_values.each do |prefix|
+      abort "Error: prefix (#{prefix}) must be <= n (#{n})" unless prefix <= n
+    end
+  end
+  
+  cores_values.each do |cores|
+    abort "Error: cores must be >= 0, got #{cores}" unless cores >= 0
+  end
+  
+  abort "Error: iterations must be >= 1, got #{iterations}" unless iterations >= 1
+  
+  {
+    algorithms: algorithms,
+    iterations: iterations,
+    languages: languages,
+    n_values: n_values,
+    prefix_values: prefix_values,
+    cores_values: cores_values
+  }
+end
+
+# Run a single test
+def run_test(algorithm, language, n, prefix, cores)
+  # Build command
+  cmd = "./source/#{language}/run #{n} #{prefix} #{cores}"
+  
+  # Execute
+  puts "#{algorithm}, #{language}, n=#{n}, prefix=#{prefix}, cores=#{cores}"
+  system(cmd)
+  puts
+end
+
+# Ensure Activity Monitor CPU meter is visible (macOS only)
+def ensure_cpu_meter
+  return unless RUBY_PLATFORM.include?('darwin')
+  
+  script = <<-'APPLESCRIPT'
+    tell application "Activity Monitor"
+      if not running then
+        launch
+        delay 0.5
+      end if
+      try
+        close window 1
+      end try
+      tell application "System Events"
+        tell process "Activity Monitor"
+          click menu item "CPU Usage" of menu "Window" of menu bar 1
+        end tell
+      end tell
+      activate
+    end tell
+    tell application "iTerm2" to activate
+  APPLESCRIPT
+  
+  system("osascript", "-e", script, out: File::NULL, err: File::NULL)
+end
+
+# Main execution
+def main(args)
+  params = parse_args(args)
+  
+  # Ensure CPU meter is visible before benchmarking
+  ensure_cpu_meter
+  
+  # Calculate column width for alignment
+  label_width = 18
+  
+  puts
+  puts "Algorithms:".ljust(label_width) + params[:algorithms].join(', ')
+  puts "Iterations:".ljust(label_width) + params[:iterations].to_s
+  puts "Languages:".ljust(label_width) + params[:languages].join(', ')
+  puts "N values:".ljust(label_width) + params[:n_values].join(', ')
+  puts "Prefix values:".ljust(label_width) + params[:prefix_values].join(', ')
+  puts "Cores values:".ljust(label_width) + params[:cores_values].join(', ')
+  puts '-' * 60
+  puts
+  
+  # Nested loops in specified order
+  params[:algorithms].each do |algorithm|
+    system("bin/switch-algorithm '#{algorithm}'")
+    puts
+    
+    params[:iterations].times do |iter|
+      params[:languages].each do |language|
+        params[:n_values].each do |n|
+          params[:prefix_values].each do |prefix|
+            next if prefix > n  # Skip invalid combinations
+            params[:cores_values].each do |cores|
+              if params[:iterations] > 1
+                puts "Iteration #{iter + 1}/#{params[:iterations]}"
+              end
+              run_test(algorithm, language, n, prefix, cores)
+            end
+          end
+        end
+      end
+    end
+  end
+end
+
+# Run if executed directly
+if __FILE__ == $0
+  main(ARGV)
+end

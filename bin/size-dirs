@@ -1,0 +1,62 @@
+#!/usr/bin/env ruby
+
+require 'fileutils'
+require_relative 'common'
+
+def analyze_directory(path)
+  subdirs = Hash.new { |h, k| h[k] = { count: 0, size: 0 } }
+  
+  # Get only top-level subdirectories
+  Dir.entries(path).each do |entry|
+    full_path = File.join(path, entry)
+    next unless File.directory?(full_path)
+    next if entry.start_with?('.')  # Skip hidden directories
+    
+    # For each subdir, recursively get all files
+    Dir.glob("#{full_path}/**/*").each do |file|
+      next unless File.file?(file)
+      subdirs[entry][:count] += 1
+      subdirs[entry][:size] += File.size(file)    
+    end
+  end
+  
+  # Calculate total size for percentages
+  total_size = subdirs.values.sum { |stats| stats[:size] }
+  
+  # Prepare table components
+  title = "Subdirectory sizes in: #{path}"
+  headers = ["Directory", "Size (MB)", "Percent", "Count", "Avg (MB)"]
+  
+  # Sort by size in descending order for body rows
+  rows = subdirs.to_a.sort_by { |_, stats| -stats[:size] }.map do |dir, stats|
+    avg_size = stats[:size] / stats[:count]
+    percent = stats[:size] * 100.0 / total_size
+    [
+      dir,
+      Common::TableFormatter.human_size_mb(stats[:size]),
+      "%.1f" % percent,
+      stats[:count].to_s,
+      Common::TableFormatter.human_size_mb(avg_size, 2)
+    ]
+  end
+
+  # Calculate totals
+  total_count = subdirs.values.sum { |stats| stats[:count] }
+  total_avg = total_size / total_count
+  totals = [
+    "Total",
+    Common::TableFormatter.human_size_mb(total_size),
+    "",
+    total_count.to_s,
+    Common::TableFormatter.human_size_mb(total_avg, 2)
+  ]
+
+  Common::TableFormatter.format_table(title, headers, rows, totals)
+end
+
+if ARGV.empty?
+  puts "Usage: #{$0} <directory>"
+  exit 1
+end
+
+analyze_directory(ARGV[0])

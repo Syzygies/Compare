@@ -1,0 +1,272 @@
+#!/usr/bin/env ruby
+
+require 'csv'
+require 'time'
+
+ENTRIES = 4 # Maximum number of entries to show per language
+
+# Parse command line arguments
+save_output = false
+brief_output = false
+args = []
+
+ARGV.each do |arg|
+  case arg
+  when "-s", "--save"
+    save_output = true
+  when "-b", "--brief"
+    brief_output = true
+  else
+    args << arg
+  end
+end
+
+if args.length < 1 || args.length > 4
+  STDERR.puts <<~USAGE
+
+    Usage: show-timings [options] <algorithm> [n] [prefix] [cores]
+    Options:
+      -s, --save    Save output to timestamped file
+    Arguments:
+      algorithm - Required: Tarjan or Loops
+      n         - Optional: the value of n to filter by (default: 10)
+      prefix    - Optional: prefix value to filter by (use _ for any)
+      cores     - Optional: cores value to filter by (use _ for any)
+    Examples:
+      show-timings Tarjan      # Show Tarjan entries for n=10
+      show-timings Loops 9     # Show Loops entries for n=9
+      show-timings Tarjan 9 3  # Show Tarjan entries for n=9, prefix=3
+      show-timings Loops 9 _ 0 # Show Loops entries for n=9, any prefix, cores=0
+  USAGE
+  exit 1
+end
+
+algorithm = args[0]
+n = args.length >= 2 ? args[1].to_i : 10
+prefix_filter = args[2] if args.length >= 3
+cores_filter = args[3] if args.length >= 4
+machine = `hostname`.strip
+
+# Machine specs - hardcoded
+MACHINE_SPECS = {
+  "Air" => "Apple M3 - 4 performance and 4 efficiency cores",
+  "Mars" => "Apple M1 - 4 performance and 4 efficiency cores", 
+  "Pluto" => "Apple M1 Ultra - 16 performance and 4 efficiency cores",
+  "Nyx" => "Apple M4 Max - 12 performance and 4 efficiency cores"
+}
+
+# Find the CSV file
+csv_file = File.expand_path("../timings/data/#{machine}.csv", __dir__)
+unless File.exist?(csv_file)
+  STDERR.puts "Error: CSV file not found: #{csv_file}"
+  exit 1
+end
+
+# Read and parse CSV data
+# Format: timestamp, host, language, algorithm, manual_version, git_version,
+#         n, prefix, cores, real, user, sys, gigaletters
+all_entries = []
+File.foreach(csv_file) do |line|
+  fields = line.strip.split(',')
+  next if fields.length < 13
+  
+  entry = {
+    timestamp: Time.parse(fields[0]),
+    host: fields[1],
+    language: fields[2],
+    algorithm: fields[3],
+    manual_version: fields[4],
+    git_version: fields[5],
+    n: fields[6].to_i,
+    prefix: fields[7].to_i,
+    cores: fields[8].to_i,
+    real: fields[9].to_f,
+    user: fields[10].to_f,
+    sys: fields[11].to_f,
+    gigaletters: fields[12].to_f
+  }
+  
+  # Keep entries matching algorithm, n and optional prefix/cores filters
+  if entry[:algorithm] == algorithm && entry[:n] == n
+    # Check prefix filter if provided
+    next if prefix_filter && prefix_filter != "_" && entry[:prefix] != prefix_filter.to_i
+    # Check cores filter if provided  
+    next if cores_filter && cores_filter != "_" && entry[:cores] != cores_filter.to_i
+    all_entries << entry
+  end
+end
+
+# Group by language
+languages = all_entries.group_by { |e| e[:language] }
+
+# For normalization, find the best performance among the most recent entries
+# that will actually be displayed (last ENTRIES per language)
+display_entries = []
+languages.each do |lang, entries|
+  sorted = entries.sort_by { |e| e[:timestamp] }
+  display_entries.concat(sorted.last(ENTRIES))
+end
+
+# Find best language and calculate its average for normalization
+if languages.any?
+  best_language_entries = languages.values.map do |entries|
+    # Take last ENTRIES for each language (what will be displayed)
+    sorted = entries.sort_by { |e| e[:timestamp] }
+    sorted.last(ENTRIES)
+  end.max_by do |entries|
+    # Find language with best average performance
+    avg = entries.sum { |e| e[:gigaletters] } / entries.length.to_f
+    avg
+  end
+
+  # Calculate the average performance of the best language
+  best_avg = best_language_entries ? best_language_entries.sum { |e| e[:gigaletters] } / best_language_entries.length.to_f : nil
+else
+  best_avg = nil
+end
+
+
+# Build the complete output as a single string
+output_lines = []
+
+# Sort languages by their average performance (descending)
+sorted_languages = languages.sort_by do |lang, entries|
+  # Take last ENTRIES for each language (what will be displayed)
+  sorted = entries.sort_by { |e| e[:timestamp] }
+  recent = sorted.last(ENTRIES)
+  avg = recent.sum { |e| e[:gigaletters] } / recent.length.to_f
+  -avg  # Negative for descending sort
+end
+
+# Brief summary
+def brief_summary(sorted_languages, best_avg)
+  max_lang = sorted_languages.map { |lang, _| lang.length }.max
+  lines = []
+  sorted_languages.each do |language, entries|
+    sorted = entries.sort_by { |e| e[:timestamp] }
+    recent = sorted.last(ENTRIES)
+    avg_score = if best_avg && best_avg > 0
+      avg_perf = recent.sum { |e| e[:gigaletters] } / recent.length.to_f
+      (avg_perf / best_avg * 100).round
+    else
+      0
+    end
+    avg_time = recent.sum { |e| e[:real] } / recent.length.to_f
+    # 50% detectable difference: 0.67 * standard error of mean
+    sd = if recent.length > 1
+      mean = avg_time
+      variance = recent.sum { |e| (e[:real] - mean) ** 2 } / (recent.length - 1).to_f
+      Math.sqrt(variance)
+    else
+      0
+    end
+    detectable = 0.67 * sd / Math.sqrt(recent.length)
+    lines << sprintf("%#{max_lang}s  %3d  %7.2fs  ±%.2fs", language.capitalize, avg_score, avg_time, detectable)
+  end
+  lines.join("\n")
+end
+
+if sorted_languages.any?
+  summary = brief_summary(sorted_languages, best_avg)
+
+  if brief_output
+    puts summary
+    exit 0
+  end
+
+  output_lines << ""
+  output_lines << summary
+  sorted_languages.each do |language, entries|
+    # Sort by timestamp (chronological order)
+    entries.sort_by! { |e| e[:timestamp] }
+    
+    # Take only the most recent entries up to the limit
+    entries = entries.last(ENTRIES)
+    
+    # Calculate average score for this language
+    avg_score = if best_avg && best_avg > 0
+      avg_perf = entries.sum { |e| e[:gigaletters] } / entries.length.to_f
+      (avg_perf / best_avg * 100).round
+    else
+      0
+    end
+    
+    # Calculate average time for this language
+    avg_time = entries.sum { |e| e[:real] } / entries.length.to_f
+    avg_time_str = "%.2f" % avg_time
+    
+    # Blank line before each block
+    output_lines << ""
+    
+    # Display language title with average score and average time
+    title = "#{language.capitalize}  #{avg_score}  #{avg_time_str}s"
+    output_lines << title.center(50)
+    
+    # Format entries for display
+    entries.each do |e|
+      date_str = e[:timestamp].strftime("%-m/%-d")
+      time_str = e[:timestamp].strftime("%H:%M")
+      
+      # Format gigaletters/sec (gops) with 2 decimal places
+      gops_str = "%.2f" % e[:gigaletters]
+      
+      # Calculate relative performance percentage (now called score)
+      score = if best_avg && best_avg > 0
+        (e[:gigaletters] / best_avg * 100).round.to_s
+      else
+        ""
+      end
+      
+      # Format time in seconds (real time) - two decimal places
+      time_sec = "%.2f" % e[:real]
+      
+      output_lines << sprintf("%6s  %5s   %6s  %7s  %6s  %6s  %5s  %7s",
+                              gops_str, score, time_sec, date_str, time_str,
+                              e[:prefix].to_s, e[:cores].to_s, "v#{e[:manual_version]}")
+    end
+  end
+  
+  # Build footer documentation
+  # Calculate n! * 2^n with comma formatting
+  factorial = (1..n).reduce(:*) || 1
+  total_perms = factorial * (2**n)
+  formatted_perms = total_perms.to_s.reverse.gsub(/(\d{3})(?=\d)/, '\\1,').reverse
+  
+  footer = <<~FOOTER
+
+      gops  score    time     date    time  prefix  cores  version
+
+    #{algorithm}, n = #{n}
+    #{machine} - #{MACHINE_SPECS[machine]}
+    n! * 2^n = #{formatted_perms} signed permutations
+    gops = billion ops/second (n ops per signed permutation)
+    score = gops normalized so best language averages 100
+    time = running time in seconds
+  FOOTER
+  
+  output_lines << footer
+  
+  # Join all output lines into a single string
+  full_output = output_lines.join("\n")
+  
+  # Print to stdout
+  puts full_output
+  
+  # Save a copy to timings directory with timestamp if requested
+  if save_output
+    timestamp = Time.now.strftime("%m-%d %H%M")
+    filter_suffix = ""
+    filter_suffix += "_p#{prefix_filter}" if prefix_filter && prefix_filter != "_"
+    filter_suffix += "_c#{cores_filter}" if cores_filter && cores_filter != "_"
+    output_file = File.expand_path("../timings/#{timestamp} #{machine}, #{algorithm}, n=#{n}#{filter_suffix}.txt", __dir__)
+    
+    File.write(output_file, full_output)
+    puts "\nSaved to: #{output_file}"
+  end
+else
+  filter_desc = "#{algorithm} n=#{n}"
+  filter_desc += ", prefix=#{prefix_filter}" if prefix_filter && prefix_filter != "_"
+  filter_desc += ", cores=#{cores_filter}" if cores_filter && cores_filter != "_"
+  puts "\nNo data found for #{filter_desc}"
+  exit 0
+end

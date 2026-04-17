@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+
+# ocaml
+# run [n] [prefix] [cores]
+
+n=${1:-}
+prefix=${2:-}
+cores=${3:-}
+
+cd "$(dirname "$0")"
+top=$(git rev-parse --show-toplevel)
+
+dune build --profile=release || exit 1
+
+"$top/bin/log-run" ./_build/default/perms.exe $n $prefix $cores

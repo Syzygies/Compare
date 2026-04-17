@@ -1,0 +1,174 @@
+#!/usr/bin/env bash
+# January 25, 2025
+# Cursor, Claude 3.5 Sonnet
+
+set -euo pipefail
+
+# Change to script directory
+cd "$(dirname "$0")" || {
+    echo "Error: Could not locate script directory. Please ensure the script exists and has proper permissions."
+    exit 1
+}
+PROJECT_ROOT="$(cd .. && pwd)" || {
+    echo "Error: Could not determine project root directory."
+    exit 1
+}
+
+# Get today's date components
+YEAR=$(date +%Y)
+MONTH_DAY=$(date +%m-%d)
+TODAY_DIR="${PROJECT_ROOT}/archive/${YEAR}/${MONTH_DAY}"
+CONTEXT_DIR="${TODAY_DIR}/context"
+
+# Create today's directory and starter files if they don't exist
+mkdir -p "${CONTEXT_DIR}" || {
+    echo "Error: Could not create today's workspace at ${CONTEXT_DIR}"
+    echo "Please check directory permissions and available disk space."
+    exit 1
+}
+for file in lessons.md quotes.md task.md; do
+    if [[ ! -f "${CONTEXT_DIR}/${file}" ]]; then
+        : > "${CONTEXT_DIR}/${file}" || {
+            echo "Error: Could not create ${file} in ${CONTEXT_DIR}"
+            echo "Please check file permissions and available disk space."
+            exit 1
+        }
+    fi
+done
+
+# First pass: cleanup old items (excluding today's folder)
+find "${PROJECT_ROOT}/archive/${YEAR}" -type f -name "index.txt" -delete || {
+    echo "Error: Failed to clean up old index.txt files"
+    echo "Please check file permissions in ${PROJECT_ROOT}/archive/${YEAR}"
+    exit 1
+}
+find "${PROJECT_ROOT}/archive/${YEAR}" -type f -empty -not -path "${TODAY_DIR}/*" -delete
+find "${PROJECT_ROOT}/archive/${YEAR}" -type d -empty -delete 2>/dev/null || true
+
+# Second pass: generate fresh indexes for all context directories
+while IFS= read -r dir; do
+    if [[ -d "$dir" ]]; then
+        # Create index.txt with header
+        echo "# Read these files. Do not edit this index, which is auto-generated." > "${dir}/index.txt"
+        echo "" >> "${dir}/index.txt"
+        
+        # List files (not directories), excluding index.txt itself
+        find "$dir" -maxdepth 1 -type f -not -name "index.txt" -print0 | \
+            while IFS= read -r -d '' file; do
+                basename "$file"
+            done | sort >> "${dir}/index.txt"
+        
+        # Remove index if no other files were found
+        if [[ $(wc -l < "${dir}/index.txt") -le 2 ]]; then
+            rm "${dir}/index.txt"
+        fi
+    fi
+done < <(find "${PROJECT_ROOT}/archive/${YEAR}" -type d -name "context")
+
+: <<'END_OF_PROMPT'
+Purpose:
+Create a daily workspace management script that helps maintain a clean, organized archive of work.
+The script creates and manages dated workspace directories with a predictable structure and clear conventions.
+It uses simple file naming patterns (like '=' prefix) to help users mark and find primary documents naturally.
+
+Core Functionality:
+1. Create today's workspace (archive/YYYY/MM-DD/context/) with starter files:
+   - lessons.md
+   - quotes.md
+   - task.md
+
+2. Maintain a clean archive structure:
+   - First pass: Remove old empty items (but preserve today's files)
+   - Second pass: Generate fresh index.txt files listing contents
+   - Files starting with '=' sort first (e.g., =overview.md), creating a natural way to mark primary docs
+
+Safety & Boundaries:
+- All operations contained within archive/YYYY/ for predictability
+- Preserve non-empty files and all of today's files
+- Create missing directories as needed
+- Run silently unless there's an error
+- Fail fast with clear, actionable error messages
+
+Technical Requirements:
+- Must work on macOS (BSD userland, no GNU extensions)
+- Must work from any directory (cd to script location first)
+- Must use $PROJECT_ROOT (via dirname/pwd after cd)
+- Must use set -euo pipefail
+- Must handle paths with spaces and special chars correctly
+
+File Handling:
+- Preserve default timestamps on new files
+- Make script idempotent (safe to run multiple times)
+- Handle special characters in filenames
+- Handle symlinks properly
+- Auto-generate index.txt in each context/ directory:
+  ```
+  # Read these files. Do not edit this index, which is auto-generated.
+
+  lessons.md
+  quotes.md
+  task.md
+  ```
+
+Example (showing both input and desired output):
+
+Input:
+archive/2025/
+├── 01-14/
+│   └── context/
+│       ├── =overview.md        [content: primary doc, sorts first]
+│       ├── drawing.png         [content: shows non-md files work]
+│       ├── notes.md            [content]
+│       └── task.md             [empty: will be removed]
+├── 01-15/
+│   └── context/                [empty dir: will be removed]
+├── 01-16/
+│   └── context/
+│       ├── notes.md            [content]
+│       └── index.txt           [old: will be regenerated]
+└── 01-17/                      [today: special handling]
+    └── context/
+        ├── lessons.md          [empty but preserved]
+        ├── quotes.md           [empty but preserved]
+        └── task.md             [empty but preserved]
+
+Output:
+archive/2025/
+├── 01-14/
+│   └── context/
+│       ├── =overview.md        [kept: has content]
+│       ├── drawing.png         [kept: has content]
+│       ├── notes.md           [kept: has content]
+│       └── index.txt           [fresh: lists all three files]
+├── 01-16/
+│   └── context/
+│       ├── notes.md           [kept: has content]
+│       └── index.txt           [fresh: lists notes.md]
+└── 01-17/                      [today: all files preserved]
+    └── context/
+        ├── lessons.md
+        ├── quotes.md
+        └── task.md
+
+Key Changes Demonstrated:
+- 01-14: Shows handling of special chars (=), mixed file types, and cleanup
+- 01-15: Shows removal of empty directories
+- 01-16: Shows regeneration of index files
+- 01-17: Shows preservation of today's files
+
+Error Handling Philosophy:
+When something unexpected occurs, fail fast with clear, actionable error messages.
+Don't try to recover automatically from situations that might need human attention.
+Each error message should indicate what went wrong and how to fix it.
+
+Test Cases:
+1. Run from different directory: cd /tmp && /path/to/bin/today
+2. Special characters: touch "archive/2025/01-14/context/= notes & stuff.md"
+3. Idempotency: ./today && ./today  # Should produce identical results
+4. Verify no GNU dependencies: shellcheck --shell=bash ./today
+
+Why This Matters:
+This script is part of a larger workflow where predictable, safe file management is crucial.
+The conventions it establishes (like = prefix for primary docs) help create a natural,
+friction-free experience for users while maintaining a clean and organized archive.
+END_OF_PROMPT

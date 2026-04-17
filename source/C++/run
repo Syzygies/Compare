@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+
+# C++
+# run [n] [prefix] [cores]
+
+n=${1:-}
+prefix=${2:-}
+cores=${3:-}
+
+cd "$(dirname "$0")"
+top=$(git rev-parse --show-toplevel)
+
+CXX="g++-14"
+CXXFLAGS="-O3 -DNDEBUG -march=native -std=c++20 -pthread"
+
+# Create build directory
+mkdir -p "_build"
+
+echo "Building C++..."
+$CXX $CXXFLAGS -I./include perms.cpp -o "_build/perms" || exit 1
+
+"$top/bin/log-run" "./_build/perms" $n $prefix $cores

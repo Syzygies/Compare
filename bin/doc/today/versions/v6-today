@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# January 28, 2025
+# Cursor, Claude 3.5 Sonnet
+
+set -euo pipefail
+
+# Change to project root using workspace-provided $top
+cd "${top}" || {
+    echo "Error: Could not locate project root. Please ensure \$top is set correctly."
+    exit 1
+}
+
+# Get today's date for directory name
+MONTH_DAY="$(date +%m-%d)"
+
+# Set up paths
+PREV_DIR="${now}"  # $now is already a full path from workspace settings
+TODAY_DIR="${top}/today/${MONTH_DAY}"
+
+# Create today's directory
+mkdir -p "${TODAY_DIR}" || {
+    echo "Error: Could not create today's workspace at ${TODAY_DIR}"
+    echo "Please check directory permissions and available disk space."
+    exit 1
+}
+
+# Create empty readme.md for today's overview
+: > "${TODAY_DIR}/readme.md" || {
+    echo "Error: Could not create readme.md in ${TODAY_DIR}"
+    echo "Please check file permissions and available disk space."
+    exit 1
+}
+
+# Copy template.md forward (DNA for future folders), but don't overwrite if exists
+if [[ -f "${PREV_DIR}/template.md" ]] && [[ ! -f "${TODAY_DIR}/template.md" ]]; then
+    cp "${PREV_DIR}/template.md" "${TODAY_DIR}/" || {
+        echo "Error: Could not copy template.md from ${PREV_DIR}"
+        echo "Please check file permissions and available disk space."
+        exit 1
+    }
+fi
+
+# Update workspace file to point $now to new directory
+sed -i '' "s|\"now\": \".*\"|\"now\": \"today/${MONTH_DAY}\"|" Compare.code-workspace || {
+    echo "Error: Could not update \$now in workspace file"
+    echo "Please check file permissions and ensure Compare.code-workspace exists."
+    exit 1
+}
+
+# Indicate if directory already existed
+if [[ -f "${TODAY_DIR}/template.md" ]]; then
+    echo "Working directory already exists: ${TODAY_DIR}"
+else
+    echo "Created new working directory: ${TODAY_DIR}"
+fi
+echo "Remember: Structure follows work. Add directories as needed."

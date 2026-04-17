@@ -1,0 +1,96 @@
+#!/usr/bin/env ruby
+
+require 'find'
+require 'pathname'
+
+def colorize(text, color_code)
+  "\e[#{color_code}m#{text}\e[0m"
+end
+
+def binary?(file)
+  return true unless File.file?(file)
+  File.read(file, 512).encode('UTF-8', invalid: :replace, replace: '').include?("\0")
+rescue
+  true
+end
+
+def search_var(varname)
+  project_root = ENV['top'] || ENV['PROJECT_ROOT'] || Dir.pwd
+  exclude_patterns = [
+    /\.git\//
+  ]
+
+  results = {
+    curly: [],     # ${VAR}
+    direct: [],    # $VAR
+    raw: [],       # VAR in assignments/declarations
+    reference: []  # VAR in text/comments/docs
+  }
+
+  Find.find(project_root) do |path|
+    next if exclude_patterns.any? { |pattern| path.match?(pattern) }
+    next if binary?(path)
+    next unless File.file?(path)
+
+    relative_path = Pathname.new(path).relative_path_from(Pathname.new(project_root)).to_s
+    
+    File.foreach(path).with_index(1) do |line, num|
+      # First find any full-word match
+      if line.match?(/\b#{varname}\b/)
+        entry = [relative_path, num, line.strip]
+        
+        # Then categorize it
+        if line.include?("${#{varname}}")
+          results[:curly] << entry
+        elsif line.match?(/\$#{varname}\b/)
+          results[:direct] << entry
+        elsif line.match?(/(export |declare |[^a-zA-Z0-9_]|^)#{varname}=/)
+          results[:raw] << entry
+        else
+          results[:reference] << entry
+        end
+      end
+    end
+  end
+
+  results
+end
+
+def print_results(varname, results)
+  puts "\n" + colorize("${#{varname}} syntax matches:", "36")
+  if results[:curly].any?
+    results[:curly].each do |path, num, line|
+      puts "  #{path}:#{num}: #{line}"
+    end
+  end
+
+  puts "\n" + colorize("$#{varname} syntax matches:", "32")
+  if results[:direct].any?
+    results[:direct].each do |path, num, line|
+      puts "  #{path}:#{num}: #{line}"
+    end
+  end
+
+  puts "\n" + colorize("#{varname} assignment matches:", "33")
+  if results[:raw].any?
+    results[:raw].each do |path, num, line|
+      puts "  #{path}:#{num}: #{line}"
+    end
+  end
+
+  puts "\n" + colorize("#{varname} other matches:", "35")
+  if results[:reference].any?
+    results[:reference].each do |path, num, line|
+      puts "  #{path}:#{num}: #{line}"
+    end
+  end
+end
+
+if ARGV.length != 1
+  puts "Usage: var-search VARNAME"
+  exit 1
+end
+
+varname = ARGV[0].upcase
+results = search_var(varname)
+print_results(varname, results) 

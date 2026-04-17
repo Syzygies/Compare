@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+
+# rust
+# run [n] [prefix] [cores]
+
+n=${1:-}
+prefix=${2:-}
+cores=${3:-}
+
+cd "$(dirname "$0")"
+top=$(git rev-parse --show-toplevel)
+
+# Set build directory
+export CARGO_TARGET_DIR="_build"
+
+# Rebuild if binary is missing or older than source
+if [[ ! -f _build/release/perms ]] || [[ perms.rs -nt _build/release/perms ]]; then
+    echo "Building Rust..."
+    cargo build --release || exit 1
+    # Clean up build artifacts, keeping only the binary
+    find _build -type f ! -name "perms" -delete 2>/dev/null || true
+    find _build -type d -empty -delete 2>/dev/null || true
+fi
+
+"$top/bin/log-run" ./_build/release/perms $n $prefix $cores

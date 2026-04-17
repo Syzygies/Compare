@@ -1,0 +1,94 @@
+#!/usr/bin/env ruby
+
+def process_file(filename)
+  lines = File.readlines(filename)
+  indent_level = 0
+  output = []
+  
+  lines.each_with_index do |line, line_num|
+    stripped = line.lstrip
+    
+    # Calculate paren balance ignoring comments and strings
+    balance = calculate_balance(stripped)
+    
+    # Warn if indent goes negative
+    if indent_level < 0
+      warn "#{filename}:#{line_num + 1}: Warning: Negative indent level #{indent_level}"
+    end
+    
+    # Output line at current indent level
+    if line.strip.empty?
+      output << "\n"
+    else
+      output << ("  " * indent_level) + stripped
+    end
+    
+    # Update indent for next line
+    indent_level += balance
+  end
+  
+  # Warn if file doesn't close at level 0
+  if indent_level != 0
+    warn "#{filename}: Warning: File ends at indent level #{indent_level}, expected 0"
+  end
+  
+  File.write(filename, output.join)
+end
+
+def calculate_balance(line)
+  balance = 0
+  i = 0
+  
+  while i < line.length
+    char = line[i]
+    
+    # Skip comments
+    if char == ';' && i + 1 < line.length && line[i + 1] == ';'
+      break
+    end
+    
+    # Handle strings
+    if char == '"'
+      i += 1
+      while i < line.length
+        if line[i] == '\\'
+          i += 2
+        elsif line[i] == '"'
+          break
+        else
+          i += 1
+        end
+      end
+      i += 1
+      next
+    end
+    
+    # Count parens
+    case char
+    when '(', '['
+      balance += 1
+    when ')', ']'
+      balance -= 1
+    end
+    
+    i += 1
+  end
+  
+  balance
+end
+
+# Process all files given as arguments
+if ARGV.empty?
+  puts "Usage: #{$0} file1.ss file2.ss ..."
+  exit 1
+end
+
+ARGV.each do |filename|
+  if !File.exist?(filename)
+    warn "File not found: #{filename}"
+    next
+  end
+  
+  process_file(filename)
+  puts "Formatted: #{filename}"
+end

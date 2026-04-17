@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Wrapper to run Julia with proper argument handling
+
+# Get the directory where this script is located
+DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# Run Julia with all arguments passed through
+exec julia -O3 --math-mode=fast --check-bounds=no -- "$DIR/src/perms.jl" "$@"

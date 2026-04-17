@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+
+# lean
+# run [n] [prefix] [cores]
+
+n=${1:-}
+prefix=${2:-}
+cores=${3:-}
+
+# Select Tarjan or Loops
+select="Tarjan"
+
+cd "$(dirname "$0")"
+top=$(git rev-parse --show-toplevel)
+
+# Build the selected algorithm using lake
+lake build "${select}" || exit 1
+
+"$top/bin/log-run" "./.lake/build/bin/${select}" $n $prefix $cores

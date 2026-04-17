@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+# January 25, 2025
+# Cursor, Deepseek r1
+
+set -euo pipefail
+
+# Get script location and project root
+cd "$(dirname "$0")"  # Move to script directory first
+PROJECT_ROOT=$(pwd)
+
+# Date handling (macOS compatible)
+today=$(date -u +"%Y-%m-%d")
+year_part="${today%%-*}"
+month_day="${today#*-}"
+archive_dir="$PROJECT_ROOT/archive/$year_part/$month_day/context"
+
+# Create today's directory structure
+mkdir -p "$archive_dir" || {
+    echo "Error: Failed to create directory $archive_dir"
+    exit 1
+}
+
+# Create starter files
+touch "$archive_dir/lessons.md" \
+      "$archive_dir/quotes.md" \
+      "$archive_dir/task.md"
+
+# Cleanup old empty files/directories
+find "$PROJECT_ROOT/archive" -mindepth 1 -maxdepth 3 -type d -print0 2>/dev/null | while IFS= read -r -d $'\0' dir; do
+    [[ "$dir" == "$archive_dir" ]] && continue
+    
+    # Remove empty files
+    find "$dir" -type f -print0 2>/dev/null | while IFS= read -r -d $'\0' file; do
+        [ ! -s "$file" ] && rm -f "$file"
+    done
+    
+    # Remove empty directories
+    find "$dir" -type d -empty -delete 2>/dev/null
+done
+
+# Generate index with heredoc prompt
+find "$PROJECT_ROOT/archive" -type d -name "context" -print0 2>/dev/null | while IFS= read -r -d $'\0' ctx_dir; do
+    cat <<EOF > "$ctx_dir/index.txt"
+# Read these files. Do not edit this index, which is auto-generated.
+
+$(find "$ctx_dir" -maxdepth 1 -type f \( -name '*' ! -name 'index.txt' \) -print0 2>/dev/null \
+    | xargs -0 -n1 basename \
+    | sort -f -k1,1 -t$'\n' --stable --ignore-case)
+EOF
+done
+
+exit 0

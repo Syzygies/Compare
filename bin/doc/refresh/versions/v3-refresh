@@ -1,0 +1,69 @@
+#!/usr/bin/env ruby
+
+require 'pathname'
+require 'open3'
+
+def get_changed_paths
+  stdout, status = Open3.capture2('git', 'status', '--porcelain')
+  return [] unless status.success?
+  
+  stdout.lines.map do |line|
+    line.strip.split(' ', 2).last
+  end
+end
+
+def get_unique_parent_dirs(paths)
+  paths.map { |path| Pathname.new(path).dirname.to_s }
+      .uniq
+      .reject { |p| p == '.' }
+      .push('.')
+end
+
+def refresh_in_finder(dir)
+  script = <<~APPLESCRIPT
+    tell application "Finder"
+      activate
+      set targetFolder to POSIX file "#{Dir.pwd}/#{dir}" as alias
+      open targetFolder
+      delay 0.1
+      close window 1
+    end tell
+  APPLESCRIPT
+  
+  system('osascript', '-e', script, out: '/dev/null', err: '/dev/null')
+end
+
+def focus_cursor
+  script = <<~APPLESCRIPT
+    tell application "Cursor" to activate
+  APPLESCRIPT
+  
+  system('osascript', '-e', script, out: '/dev/null', err: '/dev/null')
+end
+
+def cleanup_finder
+  script = <<~APPLESCRIPT
+    tell application "Finder"
+      set projectPath to POSIX file "#{Dir.pwd}" as alias
+      close (every window whose target's POSIX path starts with POSIX path of projectPath)
+    end tell
+  APPLESCRIPT
+  
+  system('osascript', '-e', script, out: '/dev/null', err: '/dev/null')
+end
+
+if ARGV[0] == 'cleanup'
+  cleanup_finder
+  exit 0
+end
+
+changed_paths = get_changed_paths
+dirs_to_refresh = get_unique_parent_dirs(changed_paths)
+
+puts "\n"
+dirs_to_refresh.each do |dir|
+  puts dir
+  refresh_in_finder(dir)
+end
+
+focus_cursor

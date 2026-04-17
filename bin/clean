@@ -1,0 +1,76 @@
+#!/usr/bin/env ruby
+# Nuclear cleanup script for Compare project
+# Finds and cleans all directories with modern run scripts
+
+require 'digest'
+require 'pathname'
+require 'fileutils'
+
+class CleanCommand
+  SIGNATURE_PATTERN = /^# compare-run-script:\s*(\w+)/
+  
+  LANGUAGE_CLEANERS = {
+    'haskell' => ->(dir) { 
+      FileUtils.rm_rf(Dir[File.join(dir, '{hidir,arm64,perms,*.hi,*.o}')])
+    },
+    'rust' => ->(dir) { 
+      FileUtils.rm_rf(File.join(dir, 'target'))
+    }
+  }
+
+  def initialize(project_root = ENV['PROJECT_ROOT'])
+    @project_root = Pathname.new(project_root)
+  end
+
+  def run
+    find_modern_run_scripts.each do |script_path|
+      clean_directory(script_path) if modern_script?(script_path)
+    end
+  end
+
+  private
+
+  def find_modern_run_scripts
+    Dir.glob([@project_root.join('source/**/run'), 
+              @project_root.join('archive/history/**/run')])
+  end
+
+  def modern_script?(script_path)
+    File.foreach(script_path).any? { |line| line.match?(SIGNATURE_PATTERN) }
+  rescue
+    false  # If file can't be read, assume it's not a modern script
+  end
+
+  def extract_language(script_path)
+    File.foreach(script_path).lazy
+        .find { |line| line.match?(SIGNATURE_PATTERN) }
+        &.match(SIGNATURE_PATTERN)
+        &.captures
+        &.first
+  rescue
+    nil
+  end
+
+  def directory_hash(dir)
+    files = Dir.chdir(dir) { Dir.glob('*', File::FNM_DOTMATCH).sort }
+    Digest::MD5.hexdigest(files.join)
+  end
+
+  def clean_directory(script_path)
+    dir = File.dirname(script_path)
+    language = extract_language(script_path)
+    return unless language && LANGUAGE_CLEANERS.key?(language)
+
+    before_hash = directory_hash(dir)
+    LANGUAGE_CLEANERS[language].call(dir)
+    after_hash = directory_hash(dir)
+
+    if before_hash != after_hash
+      puts dir.sub("#{@project_root}/", '')
+    end
+  end
+end
+
+if __FILE__ == $PROGRAM_NAME
+  CleanCommand.new.run
+end

@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+
+# ruby
+# run [n] [prefix] [cores]
+
+n=${1:-7}
+prefix=${2:-}
+cores=${3:-}
+
+cd "$(dirname "$0")"
+top=$(git rev-parse --show-toplevel)
+
+"$top/bin/log-run" ./perms.rb $n $prefix $cores
