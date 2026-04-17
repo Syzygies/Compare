@@ -106,7 +106,7 @@ I love Ruby for scripting but it doesn't scale or perform well for math research
 
 I'm an old Haskell programmer, coming from SML then OCaml. F# is not quite OCaml, with an impressive jit, and .NET rusty bedsprings poking through. I've been through Lisp, Scheme, Clojure, Erlang, Idris. All of these functional choices left me uncertain for various reasons.
 
-In my dreams I code only in Lean 4. Alas, AI really struggles to use Lean as a general purpose programming language, and while the hype sounds like it should be the fastest functional programming language around, it was too slow (like Ruby) to make this list. I will certainly revisit this question.
+In my dreams I only code in Lean 4. Alas, AI really struggles to use Lean as a general purpose programming language. While one might hope from Lean's design that it would be the fastest functional programming language, it was too slow to make this list. Lean 4 is young and under active development; I will certainly revisit this question.
 
 My bias against Java was so extreme that I ignored Scala completely, only taking another look after being puzzled by its featured status in the Zed editor. I saw a native compiler so I gave it a try. Of course, the JVM jit is faster.
 
