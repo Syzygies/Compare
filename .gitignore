@@ -27,6 +27,7 @@
 *~
 .DS_Store
 perms
+*.jar
 .scala-build/
 .bsp/
 .build/

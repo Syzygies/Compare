@@ -18,6 +18,7 @@ files = [
   "source/F#/src/perms.fs",
   "source/haskell/src/Worker.hs",
   "source/julia/src/perms.jl",
+  "source/kotlin/src/Worker.kt",
   "source/lean/run",
   "source/nim/src/perms.nim",
   "source/ocaml/src/worker.ml",

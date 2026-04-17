@@ -23,8 +23,9 @@ Two algorithms are tested: **Tarjan** (union-find with path compression) and **L
 | Rust | 100 | 19.78s | ±0.03s |
 | C++ | 99 | 20.03s | ±0.30s |
 | F# | 95 | 20.81s | ±0.09s |
-| Scala | 91 | 21.83s | ±0.04s |
-| Scala Native | 77 | 25.68s | ±0.02s |
+| Scala | 91 | 21.84s | ±0.04s |
+| Kotlin | 88 | 22.48s | ±0.14s |
+| Scala Native | 77 | 25.79s | ±0.09s |
 | Nim | 76 | 26.06s | ±0.03s |
 | Julia | 65 | 30.54s | ±0.06s |
 | Swift | 60 | 33.10s | ±0.09s |
@@ -41,8 +42,9 @@ Two algorithms are tested: **Tarjan** (union-find with path compression) and **L
 | C++ | 100 | 13.16s | ±0.12s |
 | Julia | 90 | 14.50s | ±0.01s |
 | F# | 82 | 15.89s | ±0.03s |
-| Scala | 79 | 16.64s | ±0.07s |
-| Scala Native | 76 | 17.18s | ±0.01s |
+| Kotlin | 79 | 16.54s | ±0.12s |
+| Scala | 78 | 16.80s | ±0.08s |
+| Scala Native | 76 | 17.32s | ±0.10s |
 | Nim | 74 | 17.79s | ±0.02s |
 | Swift | 65 | 20.26s | ±0.02s |
 | OCaml | 52 | 25.03s | ±0.02s |
@@ -96,11 +98,11 @@ just show Tarjan 10       # Display Tarjan results for n=10
 
 1. **Allocation in hot loops is the primary performance killer.** Top-tier performance requires eliminating allocation from the inner loops.
 
-2. **JIT compilers gain more from algorithmic complexity.** Scala JVM scores 91 on Tarjan but 79 on Loops — a wider gap than ahead-of-time compilers show between the two algorithms.
+2. **JIT compilers gain more from algorithmic complexity.** Scala JVM scores 91 on Tarjan but 78 on Loops — a wider gap than ahead-of-time compilers show between the two algorithms.
 
 3. **Simple parallel patterns work well.** A short atomic work-stealing queue is competitive with language-native parallel frameworks.
 
-4. **The top tier is readable.** Scala and F# deliver near-Rust performance with concise, expressive code.
+4. **The top tier is readable.** Scala, F#, and Kotlin deliver near-Rust performance with concise, expressive code.
 
 ### Conclusion
 
@@ -108,9 +110,11 @@ I love Ruby for scripting but it doesn't scale or perform well for math research
 
 I'm an old Haskell programmer, coming from SML then OCaml. F# is not quite OCaml, with an impressive jit, and .NET rusty bedsprings poking through. I've been through Lisp, Scheme, Clojure, Erlang, Idris. All of these functional choices left me uncertain for various reasons.
 
-In my dreams I only code in Lean 4. Alas, AI really struggles to use Lean as a general purpose programming language. While one might hope from Lean's design that it would be the fastest functional programming language, it was the slowest language on my list. Lean 4 is young and under active development; I will certainly revisit this question.
+In my dreams I only code in Lean 4. Alas, AI really struggles to use Lean as a general purpose programming language. While one might hope from Lean's design that it would be the fastest functional programming language, it is the slowest language on my list. Lean 4 is young and under active development; I will certainly revisit this question.
 
 My bias against Java was so extreme that I ignored Scala completely, only taking another look after being puzzled by its featured status in the Zed editor. I saw a native compiler so I gave it a try. Of course, the JVM jit is faster.
+
+Kotlin arrived later as the obvious second JVM comparison; it runs within noise of Scala but doesn't displace it. Kotlin could be a pragmatic choice, but it is a regression in expressiveness from Scala 3 for mathematical work.
 
 It is hard to shed prejudices about how code should look, even if learning to see clearly past convention is the only good reason to be a mathematician. I'm already quite sure how I will die: I'll read another article on Hacker News about a new programming language where I see nothing new, and I'll read that they included {}; to make C programmers comfortable. I'll have a massive stroke.
 

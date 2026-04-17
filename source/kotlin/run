@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+
+# kotlin
+# run [n] [prefix] [cores]
+
+jvm=true
+# native=true  # requires full Xcode installation
+
+n=${1:-}
+prefix=${2:-}
+cores=${3:-}
+
+cd "$(dirname "$0")"
+top=$(git rev-parse --show-toplevel)
+
+if [ "$jvm" ]; then
+  kotlinc -include-runtime -d perms.jar src/*.kt || exit 1
+  "$top/bin/log-run" "java -jar perms.jar" $n $prefix $cores
+fi
+
+if [ "$native" ]; then
+  cd kotlin-native
+  ./run $n $prefix $cores
+fi
