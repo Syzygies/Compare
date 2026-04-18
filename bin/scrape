@@ -1,0 +1,56 @@
+#!/usr/bin/env ruby
+
+# Collect timings/*.txt rows whose language starts with the given prefix.
+
+abort "Usage: #{$0} <language-prefix>" if ARGV.length != 1
+
+prefix = ARGV[0].downcase
+dir = File.expand_path("../timings", __dir__)
+summary_path = File.join(dir, "summary.txt")
+
+files = Dir.glob(File.join(dir, "*.txt")).reject { |f| f == summary_path }
+
+entries = { "Loops" => {}, "Tarjan" => {} }
+
+files.each do |file|
+  match = File.basename(file).match(/^(\d{2}-\d{2} \d{4})\b.*\b(Loops|Tarjan),/)
+  next unless match
+  timestamp = match[1]
+  algorithm = match[2]
+
+  lines = File.readlines(file, chomp: true)
+  start = lines.index { |l| !l.strip.empty? }
+  next unless start
+
+  i = start
+  while i < lines.length && !lines[i].strip.empty?
+    line = lines[i]
+    lang = line.strip.split(/\s+/).first
+    if lang && lang.downcase.start_with?(prefix)
+      entries[algorithm][lang] ||= []
+      entries[algorithm][lang] << [timestamp, line]
+    end
+    i += 1
+  end
+end
+
+entries.each_value { |langs| langs.each_value { |rows| rows.sort_by! { |ts, _| ts } } }
+
+File.open(summary_path, "w") do |f|
+  f.puts
+  ["Loops", "Tarjan"].each_with_index do |algo, section_idx|
+    f.puts if section_idx > 0
+    f.puts algo
+    f.puts
+
+    langs = entries[algo].keys.sort
+    langs.each_with_index do |lang, lang_idx|
+      f.puts if lang_idx > 0
+      entries[algo][lang].each do |ts, line|
+        f.puts "#{line}  #{ts}"
+      end
+    end
+  end
+end
+
+puts File.read(summary_path)

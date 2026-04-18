@@ -1,14 +1,12 @@
 // Loops algorithm for cycle counting
 
 class Loops(n: Int):
-  private val ends = Array.tabulate(n)(identity)
+  private val seed = Array.tabulate(n)(i => i)
+  private val ends = new Array[Int](n)
   private var sets = 0
 
   def reset(size: Int): Unit =
-    var i = 0
-    while i < size do
-      ends(i) = i
-      i += 1
+    System.arraycopy(seed, 0, ends, 0, size)
     sets = 0
 
   def unite(a: Int, b: Int): Unit =

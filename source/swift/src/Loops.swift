@@ -1,7 +1,5 @@
 // The Loops Algorithm
 
-import Foundation
-
 public class Loops {
     public static let name = "Loops"
     private var ends: [Int]
@@ -30,7 +28,7 @@ public class Loops {
             ends[eb] = ea
         }
     }
-    
+
     public func setCount() -> Int {
         return sets
     }

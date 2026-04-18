@@ -20,38 +20,38 @@ Two algorithms are tested: **Tarjan** (union-find with path compression) and **L
 
 | Language | Score | Time | Variance |
 |---|---:|---:|---:|
-| C++ | 100 | 19.67s | ±0.14s |
-| Rust | 97 | 20.18s | ±0.02s |
-| F# | 95 | 20.81s | ±0.09s |
-| Kotlin | 90 | 21.80s | ±0.07s |
-| Scala | 90 | 21.84s | ±0.04s |
-| Kotlin Native | 78 | 25.35s | ±0.32s |
-| Scala Native | 76 | 25.79s | ±0.09s |
-| Nim | 76 | 26.06s | ±0.03s |
-| Julia | 64 | 30.54s | ±0.06s |
-| Swift | 60 | 33.10s | ±0.09s |
-| OCaml | 48 | 40.94s | ±0.03s |
-| Haskell | 41 | 47.48s | ±0.05s |
-| Chez Scheme | 40 | 49.22s | ±0.07s |
+| F# | 100 | 19.17s | ±0.04s |
+| C++ | 96 | 19.92s | ±0.13s |
+| Rust | 95 | 20.20s | ±0.38s |
+| Kotlin | 89 | 21.51s | ±0.04s |
+| Scala | 88 | 21.68s | ±0.04s |
+| Kotlin Native | 81 | 23.69s | ±0.11s |
+| Scala Native | 77 | 24.72s | ±0.03s |
+| Nim | 69 | 27.92s | ±0.04s |
+| Julia | 63 | 30.54s | ±0.08s |
+| Swift | 52 | 36.86s | ±0.03s |
+| OCaml | 47 | 41.10s | ±0.10s |
+| Haskell | 40 | 47.94s | ±0.06s |
+| Chez Scheme | 39 | 49.46s | ±0.04s |
 | Lean 4 | 10 | 198.63s | ±1.02s |
 
 #### Loops (simple algorithm, predictable access patterns)
 
 | Language | Score | Time | Variance |
 |---|---:|---:|---:|
-| C++ | 100 | 13.24s | ±0.07s |
-| Rust | 100 | 13.28s | ±0.03s |
-| Julia | 91 | 14.50s | ±0.01s |
-| F# | 83 | 15.89s | ±0.03s |
-| Kotlin Native | 80 | 16.45s | ±0.01s |
-| Kotlin | 80 | 16.65s | ±0.07s |
-| Scala | 79 | 16.80s | ±0.08s |
-| Scala Native | 76 | 17.32s | ±0.10s |
-| Nim | 74 | 17.79s | ±0.02s |
-| Swift | 65 | 20.26s | ±0.02s |
-| OCaml | 53 | 25.03s | ±0.02s |
-| Haskell | 42 | 31.68s | ±0.01s |
-| Chez Scheme | 39 | 34.32s | ±0.08s |
+| C++ | 100 | 13.40s | ±0.32s |
+| Rust | 95 | 14.00s | ±0.08s |
+| Julia | 91 | 14.73s | ±0.10s |
+| F# | 91 | 14.75s | ±0.12s |
+| Kotlin Native | 89 | 15.08s | ±0.20s |
+| Scala | 87 | 15.42s | ±0.10s |
+| Kotlin | 86 | 15.56s | ±0.21s |
+| Scala Native | 86 | 15.60s | ±0.05s |
+| Nim | 65 | 20.40s | ±0.18s |
+| Swift | 65 | 20.66s | ±0.21s |
+| OCaml | 53 | 25.17s | ±0.10s |
+| Haskell | 42 | 31.77s | ±0.08s |
+| Chez Scheme | 39 | 34.19s | ±0.23s |
 | Lean 4 | 18 | 72.63s | ±0.23s |
 
 I could imagine committing to any language on this list. Various other languages were considered, and dropped as impractical.
@@ -60,9 +60,9 @@ I could imagine committing to any language on this list. Various other languages
 
 **Score** normalizes throughput so the fastest language averages 100. A score of 80 means 80% as fast as the leader.
 
-**Variance** (±) estimates the smallest timing difference that has a 50% chance of being real rather than noise. Low variance means consistent performance. Julia and Kotlin Native tie for most deterministic on Loops (±0.01s); Kotlin Native is the loosest on Tarjan (±0.32s) — a striking asymmetry.
+**Variance** (±) estimates the smallest timing difference that has a 50% chance of being real rather than noise. Scala Native runs are the most deterministic on both algorithms (±0.03s on Tarjan, ±0.05s on Loops) — a consequence of ahead-of-time compilation and predictable GC. Rust on Tarjan (±0.38s) and C++ on Loops (±0.32s) both show occasional drift in individual runs, likely thermal.
 
-**Tarjan vs Loops** reveals how well each runtime handles algorithmic complexity. JIT compilers (JVM, .NET) gain a larger advantage on Tarjan because they optimize based on observed runtime behavior. Ahead-of-time compilers (Rust, C++, Scala Native) show less difference between the two algorithms.
+**Tarjan vs Loops** reveals how well each runtime handles algorithmic complexity. JIT compilers (JVM, .NET) relatively favor Tarjan because they optimize based on observed runtime behavior — F# actually takes the Tarjan crown from C++ and Rust. Ahead-of-time compilers (Rust, C++, Scala Native) show smaller gaps between the two algorithms, and C++ holds the Loops crown.
 
 ### Architecture
 
@@ -91,7 +91,8 @@ Benchmarks use 12 performance cores to ensure fair comparison across languages.
 
 ```
 just run scala 10 3 12    # Run Scala with n=10, prefix=3, 12 cores
-just do scala 4x 10       # Benchmark: 4 iterations, both algorithms, n=10
+just do scala             # Benchmark Scala (default: 4 iterations, n=10, both algorithms)
+just do                   # Benchmark all default languages
 just report               # Save timing reports
 just show Tarjan 10       # Display Tarjan results for n=10
 ```
@@ -100,7 +101,7 @@ just show Tarjan 10       # Display Tarjan results for n=10
 
 1. **Allocation in hot loops is the primary performance killer.** Top-tier performance requires eliminating allocation from the inner loops.
 
-2. **JIT compilers gain more from algorithmic complexity.** Scala JVM scores 90 on Tarjan but 79 on Loops — a wider gap than ahead-of-time compilers show between the two algorithms.
+2. **JIT compilers gain more from algorithmic complexity.** F# takes the Tarjan crown at 100 but drops to 91 on Loops — runtime profile information helps more on the unpredictable access pattern than on the predictable one.
 
 3. **Simple parallel patterns work well.** A short atomic work-stealing queue is competitive with language-native parallel frameworks.
 
@@ -120,6 +121,4 @@ Kotlin arrived later as the obvious second JVM comparison; it runs within noise 
 
 It is hard to shed prejudices about how code should look, even if learning to see clearly past convention is the only good reason to be a mathematician. I'm already quite sure how I will die: I'll read another article on Hacker News about a new programming language where I see nothing new, and I'll read that they included {}; to make C programmers comfortable. I'll have a massive stroke.
 
-Compare the Scala 3 code to the other languages. Give yourself time to adjust, and tell me with a straight face that you'd rather code in any other language.
-
-(That's after accepting the one whopper I simply can't believe: "for" in a hot loop allocates a range object, and Scala Native doesn't optimize this away. This crashed the garbage collector. I had to write out tedious while statements, like I was back in my high school library using a paperclip to enter my first BASIC program into punched cards.)
+Compare the Scala 3 code to the other languages. Give yourself time to adjust, and tell me with a straight face that you prefer another language.

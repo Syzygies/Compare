@@ -1,7 +1,5 @@
 // Tarjan's Union-Find Algorithm
 
-import Foundation
-
 public class Tarjan {
     public static let name = "Tarjan"
     private var root: [Int]
@@ -20,35 +18,33 @@ public class Tarjan {
     }
 
     public func find(_ a: Int) -> Int {
-        var current = a
-        
-        // Find root
-        while root[current] != current {
-            current = root[current]
+        var here = a
+
+        while root[here] != here {
+            here = root[here]
         }
-        let rootVal = current
-        
-        // Path compression
-        current = a
-        while root[current] != rootVal {
-            let next = root[current]
-            root[current] = rootVal
-            current = next
+        let top = here
+
+        here = a
+        while root[here] != top {
+            let next = root[here]
+            root[here] = top
+            here = next
         }
-        
-        return rootVal
+
+        return top
     }
 
     public func unite(_ a: Int, _ b: Int) {
-        let aRoot = find(a)
-        let bRoot = find(b)
+        let a = find(a)
+        let b = find(b)
 
-        if aRoot != bRoot {
+        if a != b {
             sets -= 1
-            root[aRoot] = bRoot
+            root[a] = b
         }
     }
-    
+
     public func setCount() -> Int {
         return sets
     }

@@ -3,42 +3,42 @@
 module Tarjan
 
 type T =
-   { root : int array
+   { seed : int array
+     root : int array
      mutable sets : int }
 
 let create n =
-   { root = Array.init n (fun x -> x)
+   { seed = Array.init n (fun x -> x)
+     root = Array.zeroCreate n
      sets = n }
 
 let reset t n =
-   for i = 0 to n - 1 do
-      t.root.[i] <- i
-
+   Array.blit t.seed 0 t.root 0 n
    t.sets <- n
 
 let find t a =
-   let mutable current = a
+   let mutable here = a
 
-   while t.root.[current] <> current do
-      current <- t.root.[current]
+   while t.root.[here] <> here do
+      here <- t.root.[here]
 
-   let root = current
-   let mutable current = a
+   let top = here
+   let mutable here = a
 
-   while t.root.[current] <> root do
-      let next = t.root.[current]
-      t.root.[current] <- root
-      current <- next
+   while t.root.[here] <> top do
+      let next = t.root.[here]
+      t.root.[here] <- top
+      here <- next
 
-   root
+   top
 
 let unite t a b =
-   let aRoot = find t a
-   let bRoot = find t b
+   let a = find t a
+   let b = find t b
 
-   if aRoot <> bRoot then
+   if a <> b then
       t.sets <- t.sets - 1
-      t.root.[aRoot] <- bRoot
+      t.root.[a] <- b
 
 let setCount t = t.sets
 

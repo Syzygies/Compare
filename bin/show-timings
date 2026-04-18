@@ -248,20 +248,17 @@ if sorted_languages.any?
   
   # Join all output lines into a single string
   full_output = output_lines.join("\n")
-  
-  # Print to stdout
-  puts full_output
-  
-  # Save a copy to timings directory with timestamp if requested
+
   if save_output
     timestamp = Time.now.strftime("%m-%d %H%M")
     filter_suffix = ""
     filter_suffix += "_p#{prefix_filter}" if prefix_filter && prefix_filter != "_"
     filter_suffix += "_c#{cores_filter}" if cores_filter && cores_filter != "_"
     output_file = File.expand_path("../timings/#{timestamp} #{machine}, #{algorithm}, n=#{n}#{filter_suffix}.txt", __dir__)
-    
+
     File.write(output_file, full_output)
-    puts "\nSaved to: #{output_file}"
+  else
+    puts full_output
   end
 else
   filter_desc = "#{algorithm} n=#{n}"

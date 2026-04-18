@@ -10,21 +10,23 @@ function create(::Type{Loops}, n::Int)
 end
 
 function reset!(t::Loops, n::Int)
-    for i in 0:n-1
+    @inbounds for i in 0:n-1
         t.ends[i+1] = i
     end
     t.sets = 0
 end
 
 function unite!(t::Loops, a::Int, b::Int)
-    ea = t.ends[a+1]  # Julia uses 1-based indexing
-    eb = t.ends[b+1]
-    
-    if ea == b
-        t.sets += 1
-    else
-        t.ends[ea+1] = eb
-        t.ends[eb+1] = ea
+    @inbounds begin
+        ea = t.ends[a+1]
+        eb = t.ends[b+1]
+
+        if ea == b
+            t.sets += 1
+        else
+            t.ends[ea+1] = eb
+            t.ends[eb+1] = ea
+        end
     end
 end
 

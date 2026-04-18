@@ -1,23 +1,24 @@
 // Tarjan union-find algorithm for cycle counting
 
 class Tarjan(n: Int) {
-    private val root = IntArray(n) { it }
+    private val seed = IntArray(n) { it }
+    private val root = IntArray(n)
     private var sets = n
 
     fun reset(size: Int) {
-        for (i in 0 until size) root[i] = i
+        seed.copyInto(root, 0, 0, size)
         sets = size
     }
 
     fun find(a: Int): Int {
-        var current = a
-        while (root[current] != current) current = root[current]
-        val r = current
-        current = a
-        while (root[current] != r) {
-            val next = root[current]
-            root[current] = r
-            current = next
+        var here = a
+        while (root[here] != here) here = root[here]
+        val r = here
+        here = a
+        while (root[here] != r) {
+            val next = root[here]
+            root[here] = r
+            here = next
         }
         return r
     }

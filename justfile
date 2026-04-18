@@ -82,5 +82,9 @@ show algorithm *args="":
 
 # Save reports for both algorithms at n=10
 report:
-    bin/show-timings -s Tarjan 10
-    bin/show-timings -s Loops 10
+    @bin/show-timings -s Tarjan 10
+    @bin/show-timings -s Loops 10
+
+# Scrape timings history for a language prefix
+scrape prefix:
+    @bin/scrape {{ prefix }}

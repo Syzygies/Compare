@@ -40,6 +40,7 @@ All language implementations must conform to the following requirements to ensur
         * F#: `module Sets = Loops // Select Tarjan or Loops`
         * Haskell: `type Relations = Tarjan.Relations -- Select Tarjan or Loops`
         * Scala: comment on line before, then `type Relations = Tarjan; val name = "Tarjan"` on next line
+        * Kotlin: comment on line before, then `typealias Relations = Tarjan` on next line
         
         **Note**: When using the Worker module pattern, the algorithm selection line typically appears in the Worker module rather than the main module, since that's where the algorithm is actually used.
     * **Build-script switching**: Selection in the build/run script, provided the script contains the same pattern comment for automated switching
@@ -48,9 +49,9 @@ All language implementations must conform to the following requirements to ensur
 
 7.  **Answer Data for Validation**: Each implementation must include a data structure containing the known correct results for `n`=1 through `n`=12. This enables the program to perform self-validation upon completion. Note that for `n`≥11, some values exceed 32-bit integer limits and require 64-bit integers. In practice, this data structure can be copied from an existing, working implementation.
 
-7.  **Naming Consistency**: Use identical names across all languages, adjusting only for language conventions (runPrefix vs run_prefix). Never rename without strong justification (e.g., avoiding reserved words).
+8.  **Naming Consistency**: Use identical names across all languages, adjusting only for language conventions (runPrefix vs run_prefix). Never rename without strong justification (e.g., avoiding reserved words).
 
-8.  **Code Comments**: Comments serve as section titles for blocks of code. Avoid changelog-style comments, excessive explanation, or "what I just did" markers. See OCaml implementation for preferred style.
+9.  **Code Comments**: Comments serve as section titles for blocks of code. Avoid changelog-style comments, excessive explanation, or "what I just did" markers. See OCaml implementation for preferred style.
 
 ### 2.2. Input and Output
 
@@ -137,6 +138,14 @@ When implementing in a new language, follow these key patterns that have proven 
 - Mutable internally, immutable externally (e.g., Haskell's ST monad, OCaml's arrays)
 - Zero allocations inside loops - pre-allocate everything per parcel
 
+**Reset via seed + copy**: `reset` runs once per permutation (billions of calls at n=10). Consider block-copying from a pre-built `seed` array instead of a scalar `root[i] = i` loop. The win depends on both the runtime and the surrounding hot loop:
+- **Clear win**: JVM (Scala, Kotlin) via `System.arraycopy`, .NET (F#) via `Array.blit`/`Array.Copy`, Scala Native and Kotlin/Native via LLVM `memcpy`. These runtimes otherwise can't vectorize through safepoints, bounds checks, or GC write barriers; the intrinsic bypasses all that.
+- **Algorithm-dependent**: Rust gained ~4.4% on Tarjan (taking top score) but lost ~3% on Loops — `find`'s register-pressure profile benefits from the shorter emitted code, while `unite` was already near-ideal. Keep Rust Tarjan on seed+copy; Rust Loops stays scalar.
+- **No win**: C++ (`std::copy_n`) regressed ~4% on Loops and held flat on Tarjan. AOT LLVM at `-O3` already emits optimal vectorized code for the scalar loop, so the seed adds a useless load.
+- **Regression**: OCaml's `Array.blit` is a regular library function; call overhead dominates at n=20.
+
+Worth trying for any new language and for each algorithm; measure both before committing.
+
 **swap Function**: Define where optimal for inlining (usually Worker module). Export if needed by Perms.
 
 ### 4.3. Common Implementation Pitfalls
@@ -187,6 +196,98 @@ The `bin/switch-algorithm` script must be able to modify your source to switch b
 1. Start with n=3, verify output matches expected: `1 3 9 13 14 8`
 2. Test both algorithms produce identical results
 3. Test with different prefix values (0 to n)
-4. Scale up gradually to n=9 (the standard benchmark size)
+4. Scale up gradually to n=10 (the standard benchmark size)
 
 This specification provides all requirements for implementing the cycle distribution benchmark in a new language. For any ambiguities, consult existing implementations or contact the project lead.
+
+## 7. Current Status
+
+Benchmarked on Apple M4 Max (12 performance cores) at n=10, 4 iterations per run. Rankings shift as optimizations land; see `timings/` for the latest full report.
+
+Top tier (Tarjan score, 04-18 1316):
+- **F#**: 100 — .NET JIT intrinsifies `Array.Copy`; takes the Tarjan crown
+- **C++**: 96 — fast but verbose
+- **Rust**: 95 — peak performance, ceremony can obscure mathematics
+- **Kotlin**: 89 (JVM) / 81 (Native) — JVM peer to Scala
+- **Scala**: 88 (JVM) / 77 (Native) — strong readability + performance balance
+
+Mid tier:
+- **Nim**: 69
+- **Julia**: 63
+- **Swift**: 52
+
+Lower tier:
+- **OCaml**: 47 — syntactic pleasure offsets the performance gap for some tasks
+- **Haskell**: 40
+- **Chez Scheme**: 39
+- **Lean 4**: 10 — young language under active development; will revisit
+
+Rejected:
+- **Clojure**: too slow to warrant consideration (JVM, but emitted bytecode is not competitive)
+
+### Key Insights
+1. **Allocation in hot loops is the primary performance killer** — use while loops in hot paths to avoid Range allocation overhead in Scala
+2. **JIT compilers gain more from algorithmic complexity** — F# takes the Tarjan crown at 100 but drops to 91 on Loops, and Scala/Kotlin show the same shape. Runtime profile information helps more on Tarjan's unpredictable access pattern than on Loops' already-predictable one; AOT compilers (C++, Rust, Scala Native) show smaller Tarjan-vs-Loops gaps
+3. **Scala Native crashes if `for` loops trigger GC** — the `for` Range allocation triggers garbage collection, and worker threads in tight while loops can't reach GC safepoints, causing a fatal timeout
+4. **The sweet spot exists** — Scala 3 and Kotlin deliver near-Rust performance with concise, expressive code
+5. **Reset-via-seed-copy** (see §4.2) is a cross-cutting optimization that paid off in every language with an intrinsified copy; measurable win only in the hot-loop regime
+
+## 8. Working with This Project
+
+- `just run <language> [n] [prefix] [cores]` — single run
+- `just do [languages...] [4x|x4] [tarjan|loops] [n [prefix [cores]]]` — benchmark harness; defaults to 4 iterations at n=10, both algorithms, across the tier-1 default language set. Arguments are space-separated. `4x` or `x4` sets iterations; bare numbers set n / prefix / cores in that order; `tarjan`/`loops` (or `t`/`l`) restricts to one algorithm. Override cooldown with `COOLDOWN=<seconds>` (default 10).
+- `just report` — save fresh Tarjan + Loops timing reports into `timings/`; silent on success
+- `just show <algorithm> [n]` — display a report
+- `just scrape <language-prefix>` — collect historical rows for a language prefix across all `timings/*.txt`
+- `just format [lang]` — format source (scalafmt for Scala, language-specific otherwise)
+- `bin/switch-algorithm Tarjan` / `bin/switch-algorithm Loops` — switch all implementations
+- Performance data logged to `timings/data/{hostname}.csv`
+
+## 9. Language-Specific Notes
+
+### Scala
+- Builds both JVM and Native from `source/scala/`
+- Toggle JVM/Native in `source/scala/run` by commenting `jvm=true` or `native=true`
+- Native runs via `source/scala/scala-native/run` internally
+- Use `while` loops in Worker hot paths — `for` allocates Range objects and (on Native) can trigger fatal GC stalls
+- Format with `just format` (scalafmt, config in `.scalafmt.conf`)
+- IDE support via Metals; run `scala-cli setup-ide src/` if needed
+- Scala Native is the primary optimization target: **never degrade native for JVM**
+
+### Kotlin
+- Builds both JVM and Kotlin/Native from `source/kotlin/`
+- Toggle native in `source/kotlin/run` via `native=true`
+- Native lives at `source/kotlin/kotlin-native/` as a sibling subdirectory to the JVM source
+- Worker-API warnings in `kotlin-native/Parallel.kt` are suppressed with `@file:OptIn(kotlin.native.concurrent.ObsoleteWorkersApi::class)`
+- JVM-side warnings are suppressed via `JAVA_OPTS="--enable-native-access=ALL-UNNAMED --sun-misc-unsafe-memory-access=allow"`
+
+### Haskell
+- Uses modern Cabal v2 via GHCup with project-local builds
+- Build: `just run haskell` or `cabal build`
+- Dependencies in `dist-newstyle/`; shared package cache in `~/.cabal/store/`
+- Never use v1-style commands or global installs
+
+## 10. Algorithm Selection Pattern
+
+The `bin/switch-algorithm` script rewrites the line *following* a comment that contains the literal phrase **"Select Tarjan or Loops"**. That next line must contain either the token `Tarjan` or the token `Loops`, which the script rewrites to the chosen algorithm.
+
+Per-language examples:
+- **Rust**: `type Relations = Loops; // Select Tarjan or Loops`
+- **OCaml**: `module Sets = Loops (* Select Tarjan or Loops *)`
+- **Swift**: `typealias Relations = Loops // Select Tarjan or Loops`
+- **F#**: `module Sets = Loops // Select Tarjan or Loops`
+- **Haskell**: `type Relations = Tarjan.Relations -- Select Tarjan or Loops`
+- **Scala**: comment on line before, then `type Relations = Tarjan; val name = "Tarjan"` on the next line
+- **Kotlin**: comment on line before, then `typealias Relations = Tarjan` on the next line
+
+When using the Worker module pattern, the selection line typically lives in the Worker module, since that's where the algorithm is used.
+
+## 11. Naming as Poetry: Worked Examples
+
+This project has refined three names worth studying:
+
+- **`seed`** — the identity permutation we copy from to reset the union-find state. Evokes growing fresh state from an unchanging source. Four chars, one syllable, reads the way the code behaves.
+- **`here`** — the walking cursor in Tarjan's `find`. Reads as English: `while root(here) != here do here = root(here)`. Replaces the crumbled `current` / `cur`.
+- **`top`** — the fixed point at the end of a parent chain, used where naming the local `root` would visually collide with the `t.root` field (OCaml, F#). Even though OCaml requires field qualification and thus cannot shadow, `top` avoids the reader's momentary double-take. Scala's mandatory `this` qualification makes shadowing a real hazard, so Scala uses `r` locally for the same reason expressed more tersely.
+
+And a layout observation: in `source/scala/src/Tarjan.scala` lines 4-6, `seed`/`root`/`sets` are all 4 chars and the `=` column falls into place without any manual alignment — a bonus of naming discipline, not an invitation to pad with spaces.

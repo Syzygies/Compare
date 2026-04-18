@@ -1,11 +1,12 @@
 // Loops algorithm for cycle counting
 
 class Loops(n: Int) {
-    private val ends = IntArray(n) { it }
+    private val seed = IntArray(n) { it }
+    private val ends = IntArray(n)
     private var sets = 0
 
     fun reset(size: Int) {
-        for (i in 0 until size) ends[i] = i
+        seed.copyInto(ends, 0, 0, size)
         sets = 0
     }
 

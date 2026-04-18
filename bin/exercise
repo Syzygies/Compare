@@ -2,7 +2,8 @@
 
 require 'etc'
 
-DEFAULT_LANGUAGES = %w[ocaml C++ F# nim rust swift chez julia haskell scala]
+DEFAULT_LANGUAGES = %w[ocaml C++ F# kotlin nim rust swift chez julia haskell scala]
+COOLDOWN_SECONDS = (ENV['COOLDOWN'] || 10).to_i
 
 # Discover available languages from source directory
 def discover_languages
@@ -42,11 +43,11 @@ end
 def parse_args(args)
   # Defaults
   algorithms = %w[Loops Tarjan]
-  iterations = 1
+  iterations = 4
   available_languages = discover_languages
   languages = DEFAULT_LANGUAGES.dup
   using_default_languages = true
-  n_values = [9]
+  n_values = [10]
   prefix_values = [3]
   cores_values = [default_cores]
   
@@ -193,24 +194,28 @@ def main(args)
   puts
   puts "Algorithms:".ljust(label_width) + params[:algorithms].join(', ')
   puts "Iterations:".ljust(label_width) + params[:iterations].to_s
-  puts "Languages:".ljust(label_width) + params[:languages].join(', ')
+  puts "Languages:".ljust(label_width) + params[:languages].join(', ') + " (shuffled per iteration)"
   puts "N values:".ljust(label_width) + params[:n_values].join(', ')
   puts "Prefix values:".ljust(label_width) + params[:prefix_values].join(', ')
   puts "Cores values:".ljust(label_width) + params[:cores_values].join(', ')
+  puts "Cooldown:".ljust(label_width) + "#{COOLDOWN_SECONDS}s between runs"
   puts '-' * 60
   puts
-  
+
   # Nested loops in specified order
   params[:algorithms].each do |algorithm|
     system("bin/switch-algorithm '#{algorithm}'")
     puts
-    
+
+    first = true
     params[:iterations].times do |iter|
-      params[:languages].each do |language|
+      params[:languages].shuffle.each do |language|
         params[:n_values].each do |n|
           params[:prefix_values].each do |prefix|
             next if prefix > n  # Skip invalid combinations
             params[:cores_values].each do |cores|
+              sleep(COOLDOWN_SECONDS) if !first && COOLDOWN_SECONDS > 0
+              first = false
               if params[:iterations] > 1
                 puts "Iteration #{iter + 1}/#{params[:iterations]}"
               end

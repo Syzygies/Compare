@@ -15,22 +15,22 @@ let reset t n =
   t.sets <- n
 
 let find t a =
-  let current = ref a in
+  let here = ref a in
 
-  while t.root.(!current) <> !current do
-    current := t.root.(!current)
+  while t.root.(!here) <> !here do
+    here := t.root.(!here)
   done;
 
-  let root = !current in
-  current := a;
+  let top = !here in
+  here := a;
 
-  while t.root.(!current) <> root do
-    let next = t.root.(!current) in
-    t.root.(!current) <- root;
-    current := next
+  while t.root.(!here) <> top do
+    let next = t.root.(!here) in
+    t.root.(!here) <- top;
+    here := next
   done;
 
-  root
+  top
 
 let unite t a b =
   let a = find t a in

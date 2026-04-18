@@ -3,17 +3,17 @@
 module Loops
 
 type T =
-   { ends : int array
+   { seed : int array
+     ends : int array
      mutable sets : int }
 
 let create n =
-   { ends = Array.init n (fun x -> x)
+   { seed = Array.init n (fun x -> x)
+     ends = Array.zeroCreate n
      sets = 0 }
 
 let reset t n =
-   for i = 0 to n - 1 do
-      t.ends.[i] <- i
-
+   Array.blit t.seed 0 t.ends 0 n
    t.sets <- 0
 
 let unite t a b =

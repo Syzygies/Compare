@@ -24,29 +24,29 @@ public:
     }
 
     int find(int a) {
-        int current = a;
+        int here = a;
 
-        while (root[current] != current) {
-            current = root[current];
+        while (root[here] != here) {
+            here = root[here];
         }
-        int root_val = current;
+        int top = here;
 
-        current = a;
-        while (root[current] != root_val) {
-            int next = root[current];
-            root[current] = root_val;
-            current = next;
+        here = a;
+        while (root[here] != top) {
+            int next = root[here];
+            root[here] = top;
+            here = next;
         }
 
-        return root_val;
+        return top;
     }
 
     void unite(int a, int b) {
-        int a_root = find(a);
-        int b_root = find(b);
-        if (a_root != b_root) {
+        a = find(a);
+        b = find(b);
+        if (a != b) {
             sets--;
-            root[a_root] = b_root;
+            root[a] = b;
         }
     }
 

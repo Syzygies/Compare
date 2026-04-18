@@ -2,6 +2,7 @@
 
 #[allow(dead_code)]
 pub(crate) struct Tarjan {
+    seed: Vec<usize>,
     root: Vec<usize>,
     sets: usize,
 }
@@ -11,45 +12,41 @@ impl Tarjan {
     pub(crate) const NAME: &'static str = "Tarjan";
 
     pub(crate) fn create(n: usize) -> Self {
-        let mut root = Vec::with_capacity(n);
-        for i in 0..n {
-            root.push(i);
-        }
-        Tarjan { root, sets: n }
+        let seed: Vec<usize> = (0..n).collect();
+        let root = vec![0; n];
+        Tarjan { seed, root, sets: n }
     }
 
     pub(crate) fn reset(&mut self, n: usize) {
-        for i in 0..n {
-            self.root[i] = i;
-        }
+        self.root[..n].copy_from_slice(&self.seed[..n]);
         self.sets = n;
     }
 
     fn find(&mut self, a: usize) -> usize {
-        let mut current = a;
+        let mut here = a;
 
-        while self.root[current] != current {
-            current = self.root[current];
+        while self.root[here] != here {
+            here = self.root[here];
         }
-        let root_val = current;
+        let top = here;
 
-        current = a;
-        while self.root[current] != root_val {
-            let next = self.root[current];
-            self.root[current] = root_val;
-            current = next;
+        here = a;
+        while self.root[here] != top {
+            let next = self.root[here];
+            self.root[here] = top;
+            here = next;
         }
 
-        root_val
+        top
     }
 
     pub(crate) fn unite(&mut self, a: usize, b: usize) {
-        let a_root = self.find(a);
-        let b_root = self.find(b);
+        let a = self.find(a);
+        let b = self.find(b);
 
-        if a_root != b_root {
+        if a != b {
             self.sets -= 1;
-            self.root[a_root] = b_root;
+            self.root[a] = b;
         }
     }
 
