@@ -117,7 +117,7 @@ In my dreams I only code in Lean 4. Alas, AI really struggles to use Lean as a g
 
 My bias against Java was so extreme that I ignored Scala completely, only taking another look after being puzzled by its featured status in the Zed editor. I saw a native compiler so I gave it a try. Of course, the JVM jit is faster.
 
-Kotlin arrived later as the obvious second JVM comparison; it runs within noise of Scala but doesn't displace it. Kotlin could be a pragmatic choice, but it is a regression in expressiveness from Scala 3 for mathematical work. Clojure also targets the JVM but it's way too slow to warrant consideration.
+Kotlin arrived later as the obvious second JVM comparison; it runs neck-and-neck with Scala but doesn't displace it. Kotlin could be a pragmatic choice, but it is a regression in expressiveness from Scala 3 for mathematical work. Clojure also targets the JVM but it's way too slow to warrant consideration.
 
 It is hard to shed prejudices about how code should look, even if learning to see clearly past convention is the only good reason to be a mathematician. I'm already quite sure how I will die: I'll read another article on Hacker News about a new programming language where I see nothing new, and I'll read that they included {}; to make C programmers comfortable. I'll have a massive stroke.
 
