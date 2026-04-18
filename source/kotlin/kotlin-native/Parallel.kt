@@ -1,5 +1,7 @@
 // Parallel map with atomic work stealing (Kotlin/Native)
 
+@file:OptIn(kotlin.native.concurrent.ObsoleteWorkersApi::class)
+
 import kotlin.concurrent.AtomicInt
 import kotlin.native.concurrent.TransferMode
 import kotlin.native.concurrent.Worker

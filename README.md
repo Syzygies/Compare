@@ -23,8 +23,9 @@ Two algorithms are tested: **Tarjan** (union-find with path compression) and **L
 | C++ | 100 | 19.67s | ±0.14s |
 | Rust | 97 | 20.18s | ±0.02s |
 | F# | 95 | 20.81s | ±0.09s |
+| Kotlin | 90 | 21.80s | ±0.07s |
 | Scala | 90 | 21.84s | ±0.04s |
-| Kotlin | 87 | 22.48s | ±0.14s |
+| Kotlin Native | 78 | 25.35s | ±0.32s |
 | Scala Native | 76 | 25.79s | ±0.09s |
 | Nim | 76 | 26.06s | ±0.03s |
 | Julia | 64 | 30.54s | ±0.06s |
@@ -42,7 +43,8 @@ Two algorithms are tested: **Tarjan** (union-find with path compression) and **L
 | Rust | 100 | 13.28s | ±0.03s |
 | Julia | 91 | 14.50s | ±0.01s |
 | F# | 83 | 15.89s | ±0.03s |
-| Kotlin | 80 | 16.54s | ±0.12s |
+| Kotlin Native | 80 | 16.45s | ±0.01s |
+| Kotlin | 80 | 16.65s | ±0.07s |
 | Scala | 79 | 16.80s | ±0.08s |
 | Scala Native | 76 | 17.32s | ±0.10s |
 | Nim | 74 | 17.79s | ±0.02s |
@@ -58,7 +60,7 @@ I could imagine committing to any language on this list. Various other languages
 
 **Score** normalizes throughput so the fastest language averages 100. A score of 80 means 80% as fast as the leader.
 
-**Variance** (±) estimates the smallest timing difference that has a 50% chance of being real rather than noise. Low variance means consistent performance. C++ shows the most jitter; Haskell and Julia are the most deterministic.
+**Variance** (±) estimates the smallest timing difference that has a 50% chance of being real rather than noise. Low variance means consistent performance. Julia and Kotlin Native tie for most deterministic on Loops (±0.01s); Kotlin Native is the loosest on Tarjan (±0.32s) — a striking asymmetry.
 
 **Tarjan vs Loops** reveals how well each runtime handles algorithmic complexity. JIT compilers (JVM, .NET) gain a larger advantage on Tarjan because they optimize based on observed runtime behavior. Ahead-of-time compilers (Rust, C++, Scala Native) show less difference between the two algorithms.
 

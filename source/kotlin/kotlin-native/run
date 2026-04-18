@@ -13,6 +13,8 @@ cores=${3:-}
 cd "$(dirname "$0")"
 top=$(git rev-parse --show-toplevel)
 
+export JAVA_OPTS="--enable-native-access=ALL-UNNAMED --sun-misc-unsafe-memory-access=allow"
+
 kotlinc-native -opt -o perms \
     ../src/Answers.kt \
     ../src/Loops.kt \

@@ -34,7 +34,7 @@ fun parseArgs(args: Array<String>): Triple<Int, Int, Int>? {
 fun main(args: Array<String>) {
     val parsed = parseArgs(args)
     if (parsed == null) {
-        System.err.println("Required arguments: n prefix cores")
+        println("Required arguments: n prefix cores")
         exitProcess(1)
     }
     val (n, prefix, cores) = parsed

@@ -4,7 +4,7 @@
 # run [n] [prefix] [cores]
 
 jvm=true
-# native=true  # requires full Xcode installation
+native=true
 
 n=${1:-}
 prefix=${2:-}
