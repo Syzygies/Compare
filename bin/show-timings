@@ -161,7 +161,7 @@ def brief_summary(sorted_languages, best_avg)
       0
     end
     detectable = 0.67 * sd / Math.sqrt(recent.length)
-    lines << sprintf("%#{max_lang}s  %3d  %7.2fs  ±%.2fs", language.capitalize, avg_score, avg_time, detectable)
+    lines << sprintf("  %#{max_lang}s  %3d  %7.2fs  ±%.2fs", language.capitalize, avg_score, avg_time, detectable)
   end
   lines.join("\n")
 end

@@ -7,7 +7,7 @@
 ; Select Tarjan or Loops
 (import (tarjan))
 
-(define version 1)
+(define version 2)
 
 
 ;; Generate all prefix combinations
@@ -24,30 +24,30 @@
 
 ;; Heap's algorithm for generating permutations
 (define (heap-permute! perm j callback)
-  (let ([n (vector-length perm)])
-    (let generate ([k (- n 1)])
-      (if (< k j)
+  (let ([n (fxvector-length perm)])
+    (let generate ([k (fx- n 1)])
+      (if (fx< k j)
         (callback perm)
         (begin
-          (generate (- k 1))
-          (do ([i j (+ i 1)])
-            ((>= i k))
-            (if (even? (- j k))
+          (generate (fx- k 1))
+          (do ([i j (fx+ i 1)])
+            ((fx>= i k))
+            (if (fxeven? (fx- j k))
               (swap perm j k)
               (swap perm i k))
-            (generate (- k 1))))))))
+            (generate (fx- k 1))))))))
 
 ;; Count cycles in a signed permutation
 (define (count-cycles n perm signs rel)
-  (reset! rel (* 2 n))
-  (do ([i 0 (+ i 1)])
-    ((= i n))
-    (let* ([j (vector-ref perm i)]
-        [i0 (* 2 i)]
-        [i1 (+ i0 1)]
-        [j0 (* 2 j)]
-        [j1 (+ j0 1)])
-      (if (not (zero? (bitwise-and signs (bitwise-arithmetic-shift-left 1 i))))
+  (reset! rel (fx* 2 n))
+  (do ([i 0 (fx+ i 1)])
+    ((fx= i n))
+    (let* ([j (fxvector-ref perm i)]
+        [i0 (fx* 2 i)]
+        [i1 (fx+ i0 1)]
+        [j0 (fx* 2 j)]
+        [j1 (fx+ j0 1)])
+      (if (not (fxzero? (fxand signs (fxarithmetic-shift-left 1 i))))
         (begin
           (unite! rel i0 j1)
           (unite! rel i1 j0))
@@ -58,48 +58,48 @@
 
 ;; Tally cycles for all sign combinations
 (define (tally-cycles! n perm tally rel)
-  (let ([max-signs (bitwise-arithmetic-shift-left 1 n)])
-    (do ([signs 0 (+ signs 1)])
-      ((= signs max-signs))
+  (let ([max-signs (fxarithmetic-shift-left 1 n)])
+    (do ([signs 0 (fx+ signs 1)])
+      ((fx= signs max-signs))
       (let* ([cycles (count-cycles n perm signs rel)]
-          [index (- (* 2 n) cycles)])
-        (vector-set! tally index (+ (vector-ref tally index) 1))))))
+          [index (fx- (fx* 2 n) cycles)])
+        (fxvector-set! tally index (fx+ (fxvector-ref tally index) 1))))))
 
 ;; Process one parcel
 (define (process-parcel n k perm)
-  (let* ([perm (list->vector perm)]
-      [tally (make-vector (* 2 n) 0)]
-      [rel (make-relations (* 2 n))])
+  (let* ([perm (list->fxvector perm)]
+      [tally (make-fxvector (fx* 2 n) 0)]
+      [rel (make-relations (fx* 2 n))])
 
     (heap-permute! perm k
       (lambda (p) (tally-cycles! n p tally rel)))
 
     tally))
 
-(define (vector-add! dest src)
-  (let ([len (vector-length dest)])
-    (do ([i 0 (+ i 1)])
-      ((= i len))
-      (vector-set! dest i (+ (vector-ref dest i)
-          (vector-ref src i))))))
+(define (fxvector-add! dest src)
+  (let ([len (fxvector-length dest)])
+    (do ([i 0 (fx+ i 1)])
+      ((fx= i len))
+      (fxvector-set! dest i (fx+ (fxvector-ref dest i)
+          (fxvector-ref src i))))))
 
 (define (compute-tally n prefix cores)
   (let* ([parcels (prefixes n prefix)]
-      [parcel-results (parallel-map cores 
+      [parcel-results (parallel-map cores
           (lambda (p) (process-parcel n prefix p))
           parcels)]
-      [result (make-vector (* 2 n) 0)])
-    (for-each (lambda (parcel-result) 
-        (vector-add! result parcel-result))
+      [result (make-fxvector (fx* 2 n) 0)])
+    (for-each (lambda (parcel-result)
+        (fxvector-add! result parcel-result))
       parcel-results)
     result))
 
-(define (print-vector vec)
-  (let ([len (vector-length vec)])
-    (do ([i 0 (+ i 1)])
-      ((= i len))
-      (display (vector-ref vec i))
-      (when (< i (- len 1))
+(define (print-fxvector vec)
+  (let ([len (fxvector-length vec)])
+    (do ([i 0 (fx+ i 1)])
+      ((fx= i len))
+      (display (fxvector-ref vec i))
+      (when (fx< i (fx- len 1))
         (display " ")))
     (newline)))
 
@@ -126,12 +126,12 @@
         (let* ([result (compute-tally n prefix cores)]
             [expected (if (<= n 12) (vector-ref answers n) #f)])
 
-          (print-vector result)
+          (print-fxvector result)
 
           (cond
             [(> n 12) (display "?\n")]
-            [(equal? (vector->list result) expected) (display "✓\n")]
-            [else 
+            [(equal? (fxvector->list result) expected) (display "✓\n")]
+            [else
               (display "✗\n")
               (for-each (lambda (x) (display x) (display " ")) expected)
               (newline)]))))))

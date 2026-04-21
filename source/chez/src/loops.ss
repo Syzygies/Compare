@@ -18,7 +18,7 @@
     (protocol
       (lambda (new)
         (lambda (n)
-          (new (make-vector n 0) 0)))))
+          (new (make-fxvector n 0) 0)))))
 
   (define (make-relations n)
     (let
@@ -31,21 +31,21 @@
     (let
       ([ends (relations-ends rel)])
       (do
-        ([i 0 (+ i 1)])
-        ((= i n))
-        (vector-set! ends i i))))
+        ([i 0 (fx+ i 1)])
+        ((fx= i n))
+        (fxvector-set! ends i i))))
 
   (define (unite! rel a b)
     (let*
       ([ends (relations-ends rel)]
-        [ea (vector-ref ends a)]
-        [eb (vector-ref ends b)])
-      (if (= ea b)
+        [ea (fxvector-ref ends a)]
+        [eb (fxvector-ref ends b)])
+      (if (fx= ea b)
         (relations-sets-set! rel
-          (+ (relations-sets rel) 1))
+          (fx+ (relations-sets rel) 1))
         (begin
-          (vector-set! ends ea eb)
-          (vector-set! ends eb ea)))))
+          (fxvector-set! ends ea eb)
+          (fxvector-set! ends eb ea)))))
 
   (define (set-count rel)
     (relations-sets rel))

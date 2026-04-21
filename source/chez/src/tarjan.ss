@@ -14,7 +14,7 @@
     (protocol
       (lambda (new)
         (lambda (n)
-          (new (make-vector n 0) n)))))
+          (new (make-fxvector n 0) n)))))
 
   (define (make-relations n)
     (let ([rel (%make-relations n)])
@@ -24,27 +24,27 @@
   (define (reset! rel n)
     (relations-sets-set! rel n)
     (let ([root (relations-root rel)])
-      (do ([i 0 (+ i 1)])
-        ((= i n))
-        (vector-set! root i i))))
+      (do ([i 0 (fx+ i 1)])
+        ((fx= i n))
+        (fxvector-set! root i i))))
 
   ;; Find with path compression
   (define (find-root rel a)
     (let ([root (relations-root rel)])
       (let loop ([x a])
-        (let ([parent (vector-ref root x)])
-          (if (= parent x)
+        (let ([parent (fxvector-ref root x)])
+          (if (fx= parent x)
             x
             (let ([root-x (loop parent)])
-              (vector-set! root x root-x)
+              (fxvector-set! root x root-x)
               root-x))))))
 
   (define (unite! rel a b)
     (let ([a-root (find-root rel a)]
         [b-root (find-root rel b)])
-      (when (not (= a-root b-root))
-        (relations-sets-set! rel (- (relations-sets rel) 1))
-        (vector-set! (relations-root rel) a-root b-root))))
+      (when (not (fx= a-root b-root))
+        (relations-sets-set! rel (fx- (relations-sets rel) 1))
+        (fxvector-set! (relations-root rel) a-root b-root))))
 
   (define (set-count rel)
     (relations-sets rel))

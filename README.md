@@ -31,8 +31,8 @@ Two algorithms are tested: **Tarjan** (union-find with path compression) and **L
 | Julia | 63 | 30.54s | ±0.08s |
 | Swift | 52 | 36.86s | ±0.03s |
 | OCaml | 47 | 41.10s | ±0.10s |
+| Chez Scheme | 45 | 43.00s | ±0.03s |
 | Haskell | 40 | 47.94s | ±0.06s |
-| Chez Scheme | 39 | 49.46s | ±0.04s |
 | Lean 4 | 10 | 198.63s | ±1.02s |
 
 #### Loops (simple algorithm, predictable access patterns)
@@ -50,8 +50,8 @@ Two algorithms are tested: **Tarjan** (union-find with path compression) and **L
 | Nim | 65 | 20.40s | ±0.18s |
 | Swift | 65 | 20.66s | ±0.21s |
 | OCaml | 53 | 25.17s | ±0.10s |
+| Chez Scheme | 49 | 27.13s | ±0.06s |
 | Haskell | 42 | 31.77s | ±0.08s |
-| Chez Scheme | 39 | 34.19s | ±0.23s |
 | Lean 4 | 18 | 72.63s | ±0.23s |
 
 I could imagine committing to any language on this list. Various other languages were considered, and dropped as impractical.
