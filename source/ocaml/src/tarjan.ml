@@ -16,7 +16,6 @@ let reset t n =
 
 let find t a =
   let here = ref a in
-
   while t.root.(!here) <> !here do
     here := t.root.(!here)
   done;
@@ -29,15 +28,14 @@ let find t a =
     t.root.(!here) <- top;
     here := next
   done;
-
   top
 
 let unite t a b =
   let a = find t a in
   let b = find t b in
+
   if a <> b then
     ( t.sets <- t.sets - 1;
       t.root.(a) <- b )
 
 let set_count t = t.sets
-let name = "Tarjan"

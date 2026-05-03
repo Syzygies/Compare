@@ -1,7 +1,7 @@
 (* Worker module: hot loop performance-critical code *)
 
 (* Select Tarjan or Loops *)
-module Sets = Tarjan
+module Sets = Tarjan let name = "Tarjan"
 
 (* Heap's algorithm: tally all perms with a fixed length k prefix *)
 let tally_perms perm k work =

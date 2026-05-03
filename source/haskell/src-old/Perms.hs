@@ -1,7 +1,12 @@
 -- Signed Permutation Cycle Counting
 
-import Begin
+import Control.Applicative ((<$>), (<*>))
+import Control.Monad
+import Control.Monad.ST
+import Data.List (foldl')
+import Data.Vector.Unboxed (Vector)
 import qualified Data.Vector.Unboxed as V
+import qualified Data.Vector.Unboxed.Mutable as MV
 import System.Environment (getArgs)
 import System.Exit (exitFailure)
 import System.IO (hPutStrLn, stderr)
@@ -13,7 +18,7 @@ import Parallel (parallelMap)
 import Worker (runPrefix, algName)
 
 version :: Int
-version = 18
+version = 17
 
 -- Generate initial permutation for each possible prefix
 enumPrefixes :: Int -> Int -> [[Int]]
@@ -27,12 +32,12 @@ enumPrefixes n k =
 
 -- Distribute work parcels and combine results
 runParcels :: Int -> Int -> Vector Int
-runParcels n k =
-   let parcels = enumPrefixes n k
+runParcels n prefix =
+   let parcels = enumPrefixes n prefix
        worker p = runST (runPrefix n p)
        results = parallelMap worker parcels
        zero = V.replicate (2 * n) 0
-   in foldl' (V.zipWith (+)) zero results
+    in foldl' (V.zipWith (+)) zero results
 
 -- Parse command-line arguments
 parseArgs :: [String] -> Maybe (Int, Int, Int)
@@ -56,7 +61,11 @@ main = do
             n
             prefix
             cores
-         check n (V.toList (runParcels n prefix))
+
+         let result = runParcels n prefix
+         let list = V.toList result
+
+         check n list
       Nothing ->
          hPutStrLn stderr "Required arguments: n prefix cores"
             >> exitFailure

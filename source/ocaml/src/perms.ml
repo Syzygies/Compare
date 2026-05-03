@@ -38,7 +38,7 @@ let () =
   match parse_args Sys.argv with
   | Some (n, prefix, cores) ->
       Printf.printf "%s v%d, n = %d, prefix = %d, cores = %d\n"
-        Worker.Sets.name version n prefix cores;
+        Worker.name version n prefix cores;
       let result = run_parcels n prefix cores in
       Answers.check n result
   | None -> 

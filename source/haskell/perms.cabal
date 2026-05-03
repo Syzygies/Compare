@@ -5,7 +5,8 @@ version:       0.1.0.0
 executable perms
   main-is:        Perms.hs
   hs-source-dirs: src
-  other-modules:  Answers, Loops, Parallel, Tarjan, Worker
+  other-modules:  Answers, Begin, Loops, Parallel, Tarjan, Worker
   build-depends:  base, parallel, vector
+  default-extensions: NamedFieldPuns
   ghc-options:    -O2 -threaded -rtsopts
   default-language: Haskell2010

@@ -2,7 +2,7 @@
 
 object Worker:
 
-// Select Tarjan or Loops
+  // Select Tarjan or Loops
   type Relations = Tarjan; val name = "Tarjan"
 
   // Heap's algorithm: tally all perms with a fixed length k prefix

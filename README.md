@@ -20,39 +20,41 @@ Two algorithms are tested: **Tarjan** (union-find with path compression) and **L
 
 | Language | Score | Time | Variance |
 |---|---:|---:|---:|
-| F# | 100 | 19.17s | ±0.04s |
-| C++ | 96 | 19.92s | ±0.13s |
-| Rust | 95 | 20.20s | ±0.38s |
-| Kotlin | 89 | 21.51s | ±0.04s |
-| Scala | 88 | 21.68s | ±0.04s |
-| Kotlin Native | 81 | 23.69s | ±0.11s |
-| Scala Native | 77 | 24.72s | ±0.03s |
-| Nim | 69 | 27.92s | ±0.04s |
-| Julia | 63 | 30.54s | ±0.08s |
-| Swift | 52 | 36.86s | ±0.03s |
-| OCaml | 47 | 41.10s | ±0.10s |
-| Chez Scheme | 45 | 43.00s | ±0.03s |
-| Haskell | 40 | 47.94s | ±0.06s |
+| F# | 100 | 19.24s | ±0.04s |
+| Rust | 100 | 19.23s | ±0.06s |
+| C++ | 97 | 19.89s | ±0.27s |
+| Kotlin | 89 | 21.59s | ±0.04s |
+| Scala | 87 | 22.01s | ±0.14s |
+| Kotlin Native | 82 | 23.60s | ±0.03s |
+| Scala Native | 74 | 26.16s | ±0.02s |
+| Nim | 69 | 27.79s | ±0.04s |
+| Julia | 63 | 30.76s | ±0.04s |
+| Swift | 51 | 37.69s | ±0.45s |
+| OCaml | 47 | 41.20s | ±0.05s |
+| Chez Scheme | 45 | 42.98s | ±0.04s |
+| Haskell | 36 | 53.42s | ±0.20s |
 | Lean 4 | 10 | 198.63s | ±1.02s |
+| Clojure | 3 | 739.51s | ±1.75s |
 
 #### Loops (simple algorithm, predictable access patterns)
 
 | Language | Score | Time | Variance |
 |---|---:|---:|---:|
-| C++ | 100 | 13.40s | ±0.32s |
-| Rust | 95 | 14.00s | ±0.08s |
-| Julia | 91 | 14.73s | ±0.10s |
-| F# | 91 | 14.75s | ±0.12s |
-| Kotlin Native | 89 | 15.08s | ±0.20s |
-| Scala | 87 | 15.42s | ±0.10s |
-| Kotlin | 86 | 15.56s | ±0.21s |
-| Scala Native | 86 | 15.60s | ±0.05s |
-| Nim | 65 | 20.40s | ±0.18s |
-| Swift | 65 | 20.66s | ±0.21s |
-| OCaml | 53 | 25.17s | ±0.10s |
-| Chez Scheme | 49 | 27.13s | ±0.06s |
-| Haskell | 42 | 31.77s | ±0.08s |
+| C++ | 100 | 13.41s | ±0.21s |
+| Rust | 97 | 13.78s | ±0.21s |
+| F# | 91 | 14.70s | ±0.03s |
+| Julia | 91 | 14.79s | ±0.09s |
+| Kotlin Native | 90 | 14.85s | ±0.01s |
+| Kotlin | 87 | 15.40s | ±0.09s |
+| Scala | 80 | 16.74s | ±0.07s |
+| Scala Native | 79 | 16.94s | ±0.03s |
+| Nim | 66 | 20.27s | ±0.06s |
+| Swift | 65 | 20.75s | ±0.14s |
+| OCaml | 53 | 25.20s | ±0.06s |
+| Chez Scheme | 49 | 27.10s | ±0.05s |
+| Haskell | 38 | 35.10s | ±0.09s |
 | Lean 4 | 18 | 72.63s | ±0.23s |
+| Clojure | 2 | 543.40s | ±0.24s |
 
 I could imagine committing to any language on this list. Various other languages were considered, and dropped as impractical.
 
@@ -60,9 +62,9 @@ I could imagine committing to any language on this list. Various other languages
 
 **Score** normalizes throughput so the fastest language averages 100. A score of 80 means 80% as fast as the leader.
 
-**Variance** (±) estimates the smallest timing difference that has a 50% chance of being real rather than noise. Scala Native runs are the most deterministic on both algorithms (±0.03s on Tarjan, ±0.05s on Loops) — a consequence of ahead-of-time compilation and predictable GC. Rust on Tarjan (±0.38s) and C++ on Loops (±0.32s) both show occasional drift in individual runs, likely thermal.
+**Variance** (±) estimates the smallest timing difference that has a 50% chance of being real rather than noise. Scala Native runs are the most deterministic on both algorithms (±0.02s on Tarjan, ±0.03s on Loops) — a consequence of ahead-of-time compilation and predictable GC. C++ shows occasional drift on both algorithms (±0.27s on Tarjan, ±0.21s on Loops) and Swift on Tarjan (±0.45s), likely thermal.
 
-**Tarjan vs Loops** reveals how well each runtime handles algorithmic complexity. JIT compilers (JVM, .NET) relatively favor Tarjan because they optimize based on observed runtime behavior — F# actually takes the Tarjan crown from C++ and Rust. Ahead-of-time compilers (Rust, C++, Scala Native) show smaller gaps between the two algorithms, and C++ holds the Loops crown.
+**Tarjan vs Loops** reveals how well each runtime handles algorithmic complexity. JIT compilers (JVM, .NET) relatively favor Tarjan because they optimize based on observed runtime behavior — F# now ties Rust at the Tarjan crown, with C++ a close third. Ahead-of-time compilers (Rust, C++, Scala Native) show smaller gaps between the two algorithms, and C++ holds the Loops crown.
 
 ### Architecture
 
@@ -101,11 +103,11 @@ just show Tarjan 10       # Display Tarjan results for n=10
 
 1. **Allocation in hot loops is the primary performance killer.** Top-tier performance requires eliminating allocation from the inner loops.
 
-2. **JIT compilers gain more from algorithmic complexity.** F# takes the Tarjan crown at 100 but drops to 91 on Loops — runtime profile information helps more on the unpredictable access pattern than on the predictable one.
+2. **JIT compilers gain more from algorithmic complexity.** F# and Rust tie the Tarjan crown at 100, but F# drops to 91 on Loops while Rust holds at 97 — runtime profile information helps more on the unpredictable access pattern.
 
 3. **Simple parallel patterns work well.** A short atomic work-stealing queue is competitive with language-native parallel frameworks.
 
-4. **The top tier is readable.** Scala, F#, and Kotlin deliver near-Rust performance with concise, expressive code.
+4. **The top JIT tier is readable.** F#, Kotlin, and Scala 3 deliver competitive performance with concise, expressive code.
 
 ### Conclusion
 
@@ -117,8 +119,10 @@ In my dreams I only code in Lean 4. Alas, AI really struggles to use Lean as a g
 
 My bias against Java was so extreme that I ignored Scala completely, only taking another look after being puzzled by its featured status in the Zed editor. I saw a native compiler so I gave it a try. Of course, the JVM jit is faster.
 
-Kotlin arrived later as the obvious second JVM comparison; it runs neck-and-neck with Scala but doesn't displace it. Kotlin could be a pragmatic choice, but it is a regression in expressiveness from Scala 3 for mathematical work. Clojure also targets the JVM but it's way too slow to warrant consideration.
+Kotlin arrived later as the obvious second JVM comparison; it runs neck-and-neck with Scala but doesn't displace it. Kotlin could be a pragmatic choice, but it is a regression in expressiveness from Scala 3 for mathematical work. Clojure also targets the JVM but landed at scores 2 and 3 across the two algorithms — ~40× slower than C++, and the only language slower than Lean 4. Way too slow to warrant consideration.
 
 It is hard to shed prejudices about how code should look, even if learning to see clearly past convention is the only good reason to be a mathematician. I'm already quite sure how I will die: I'll read another article on Hacker News about a new programming language where I see nothing new, and I'll read that they included {}; to make C programmers comfortable. I'll have a massive stroke.
 
-Compare the Scala 3 code to the other languages. Give yourself time to adjust, and tell me with a straight face that you prefer another language.
+Haskell uniquely abstracts on two axes simultaneously. A single `traverse f xs` works across every traversable container — list, tree, map, custom data type — *and* every applicative effect — failure, IO, accumulation, validation. OCaml requires per-container code or explicit functor passing for each combination. Scala has the machinery via type classes, but the ceremony discourages casual use. For research code that constantly composes operations across structures-with-effects, that double-axis abstraction is the load-bearing argument for Haskell.
+
+Scala resoundedly wins this comparison study, to my eyes. At the same time, this comparison raises the wrong questions. Especially with the advent of AI, the right question is which language supports the highest level architectural thought, and at the same time is suitable for real work. I'm the bottleneck, not my computer processing power. One could say Haskell hits that abstract-yet-practical sweet spot, and I did know this before starting this comparison project. I needed to know if there was a different answer.

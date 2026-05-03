@@ -1,6 +1,7 @@
 // Parallel map with atomic work stealing
 
-import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicInteger as Atomic
+import java.util.concurrent.ThreadLocalRandom as Random
 
 object Parallel:
   def map[T, R: reflect.ClassTag](
@@ -10,12 +11,11 @@ object Parallel:
       tasks: Array[T]
   ): Array[R] =
     val count = tasks.length
-    val next = AtomicInteger(0)
+    val next = Atomic(0)
     val results = Array.fill(count)(init)
 
-    // Shuffle work order for load balancing
     val order = Array.tabulate(count)(identity)
-    val rng = java.util.concurrent.ThreadLocalRandom.current()
+    val rng = Random.current()
     var i = count - 1
     while i > 0 do
       val j = rng.nextInt(i + 1)
@@ -30,7 +30,7 @@ object Parallel:
         index = next.getAndIncrement()
 
     val threads = Array.tabulate(cores - 1) { _ =>
-      val t = Thread((() => worker()): Runnable)
+      val t = Thread(() => worker())
       t.start()
       t
     }

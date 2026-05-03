@@ -266,6 +266,7 @@ Rejected:
 - Build: `just run haskell` or `cabal build`
 - Dependencies in `dist-newstyle/`; shared package cache in `~/.cabal/store/`
 - Never use v1-style commands or global installs
+- After changes to cabal config (deps, default-extensions), restart Zed entirely — HLS's "restart language server" command does not clear the cradle plan cache
 
 ## 10. Algorithm Selection Pattern
 

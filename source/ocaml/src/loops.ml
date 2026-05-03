@@ -24,4 +24,3 @@ let unite t a b =
       t.ends.(eb) <- ea )
 
 let set_count t = t.sets
-let name = "Loops"
